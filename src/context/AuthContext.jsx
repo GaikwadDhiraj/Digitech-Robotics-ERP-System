@@ -1,79 +1,123 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect } from "react";
+import { useUser } from "@clerk/nextjs";
 
 const AuthContext = createContext();
+
+const ADMIN_EMAIL = "dvgaikwad333@gmail.com";
 
 export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(null);
   const [employees, setEmployees] = useState([]);
   const [role, setRole] = useState("EMPLOYEE"); // "ADMIN" or "EMPLOYEE"
   const [isLoading, setIsLoading] = useState(true);
+  const [authError, setAuthError] = useState(null);
+  const [isAuthorized, setIsAuthorized] = useState(false);
 
-  // Fetch employees list to populate users
+  // Clerk User hook
+  const { isLoaded: isClerkLoaded, isSignedIn: isClerkSignedIn, user: clerkUser } = useUser();
+
+  // Fetch employees list from DB (accessible to authenticated users)
   const refreshUsers = async () => {
     try {
       const res = await fetch("/api/employees");
       const result = await res.json();
-      if (result.success && result.data.length > 0) {
+      if (result.success && Array.isArray(result.data)) {
         setEmployees(result.data);
-        
-        // Restore from localStorage or default
-        const savedRole = localStorage.getItem("digitech_erp_role") || "EMPLOYEE";
-        const savedUserId = localStorage.getItem("digitech_erp_user_id");
-
-        setRole(savedRole);
-
-        if (savedRole === "ADMIN") {
-          const adminUser = result.data.find((e) => e.role === "ADMIN") || result.data[0];
-          setCurrentUser(adminUser);
-        } else {
-          const empUser = result.data.find((e) => e.id === savedUserId) || result.data.find((e) => e.role === "EMPLOYEE") || result.data[0];
-          setCurrentUser(empUser);
-        }
+        return result.data;
       }
     } catch (err) {
       console.error("Failed to load users:", err);
-    } finally {
-      setIsLoading(false);
     }
+    return [];
   };
 
+  // Sync Clerk authenticated user to DB immediately upon login
   useEffect(() => {
-    refreshUsers();
-  }, []);
+    if (!isClerkLoaded) return;
 
-  const switchRole = (newRole) => {
-    setRole(newRole);
-    localStorage.setItem("digitech_erp_role", newRole);
-    if (newRole === "ADMIN") {
-      const adminUser = employees.find((e) => e.role === "ADMIN") || {
-        id: "admin-1",
-        employeeId: "ADM-001",
-        name: "Admin User",
-        email: "admin@digitech.com",
-        designation: "System Administrator",
-        role: "ADMIN",
-        department: "Administration",
-      };
-      setCurrentUser(adminUser);
-      localStorage.setItem("digitech_erp_user_id", adminUser.id);
-    } else {
-      const empUser = employees.find((e) => e.role === "EMPLOYEE") || employees[0];
-      if (empUser) {
-        setCurrentUser(empUser);
-        localStorage.setItem("digitech_erp_user_id", empUser.id);
+    if (!isClerkSignedIn) {
+      setCurrentUser(null);
+      setIsAuthorized(false);
+      setAuthError(null);
+      setIsLoading(false);
+      return;
+    }
+
+    if (isClerkSignedIn && clerkUser) {
+      const email = clerkUser.primaryEmailAddress?.emailAddress;
+      const name =
+        clerkUser.fullName ||
+        [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ") ||
+        email?.split("@")[0] ||
+        "Employee User";
+      const avatarUrl = clerkUser.imageUrl;
+      const clerkId = clerkUser.id;
+
+      if (email) {
+        setIsLoading(true);
+        fetch("/api/auth/sync", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ clerkId, email, name, avatarUrl }),
+        })
+          .then(async (res) => {
+            const resData = await res.json();
+            if (res.ok && resData.success && resData.user) {
+              setCurrentUser(resData.user);
+              setIsAuthorized(true);
+              setAuthError(null);
+
+              // Set role
+              const userRole = resData.user.role || (email.toLowerCase() === ADMIN_EMAIL.toLowerCase() ? "ADMIN" : "EMPLOYEE");
+              setRole(userRole);
+              localStorage.setItem("digitech_erp_role", userRole);
+              localStorage.setItem("digitech_erp_user_id", resData.user.id);
+
+              // Refresh list so newly verified employee appears
+              refreshUsers();
+            } else {
+              // Access denied (user email not registered by admin)
+              setIsAuthorized(false);
+              setAuthError(resData.message || "Your official email is not registered in the system.");
+              setCurrentUser(null);
+            }
+          })
+          .catch((err) => {
+            console.error("Failed to sync logged-in email to database:", err);
+            setAuthError("Failed to communicate with authentication server.");
+            setIsAuthorized(false);
+          })
+          .finally(() => {
+            setIsLoading(false);
+          });
       }
     }
+  }, [isClerkLoaded, isClerkSignedIn, clerkUser?.id]);
+
+  const switchRole = (newRole) => {
+    // Only real ADMIN can switch to ADMIN view
+    const isRealAdmin =
+      currentUser?.role === "ADMIN" ||
+      currentUser?.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+
+    if (newRole === "ADMIN" && !isRealAdmin) {
+      alert("Access Denied: Only administrators can access Admin view.");
+      return;
+    }
+
+    setRole(newRole);
+    localStorage.setItem("digitech_erp_role", newRole);
   };
 
   const switchEmployeeUser = (employeeId) => {
-    const selected = employees.find((e) => e.id === employeeId);
-    if (selected) {
-      setCurrentUser(selected);
-      setRole(selected.role);
-      localStorage.setItem("digitech_erp_role", selected.role);
-      localStorage.setItem("digitech_erp_user_id", selected.id);
+    // Admin can preview specific employees
+    if (currentUser?.role === "ADMIN") {
+      const selected = employees.find((e) => e.id === employeeId);
+      if (selected) {
+        setCurrentUser(selected);
+      }
     }
   };
 
@@ -84,6 +128,10 @@ export function AuthProvider({ children }) {
     );
   };
 
+  const isRealAdmin =
+    currentUser?.role === "ADMIN" ||
+    currentUser?.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+
   return (
     <AuthContext.Provider
       value={{
@@ -92,11 +140,16 @@ export function AuthProvider({ children }) {
         employees,
         refreshUsers,
         role,
-        isAdmin: role === "ADMIN",
+        isAdmin: isRealAdmin && role === "ADMIN",
+        isRealAdmin,
+        isAuthorized,
+        authError,
         switchRole,
         switchEmployeeUser,
         updateUserProfile,
         isLoading,
+        clerkUser,
+        isClerkSignedIn,
       }}
     >
       {children}

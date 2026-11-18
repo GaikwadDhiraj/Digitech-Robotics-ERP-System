@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 
 export default function Header() {
-  const { currentUser, role, isAdmin, switchRole, switchEmployeeUser, employees } = useAuth();
+  const { currentUser, role, isAdmin, isRealAdmin, switchRole, switchEmployeeUser, employees } = useAuth();
   const [isPhotoModalOpen, setIsPhotoModalOpen] = useState(false);
 
   return (
@@ -47,43 +47,50 @@ export default function Header() {
 
       {/* Right: Role Switcher & User Info */}
       <div className="flex items-center gap-4">
-        {/* Role Toggle Button */}
-        <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200">
-          <button
-            onClick={() => switchRole("EMPLOYEE")}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
-              !isAdmin
-                ? "bg-white text-rose-900 shadow-xs font-bold"
-                : "text-slate-600 hover:text-slate-900"
-            }`}
-          >
-            <User className="w-3.5 h-3.5" />
-            Employee View
-          </button>
-          <button
-            onClick={() => switchRole("ADMIN")}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
-              isAdmin
-                ? "bg-rose-800 text-white shadow-xs font-bold"
-                : "text-slate-600 hover:text-slate-900"
-            }`}
-          >
-            <ShieldCheck className="w-3.5 h-3.5" />
-            Admin View
-          </button>
-        </div>
+        {/* Role Toggle Button - only visible if user is Real Admin */}
+        {isRealAdmin ? (
+          <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200">
+            <button
+              onClick={() => switchRole("EMPLOYEE")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                !isAdmin
+                  ? "bg-white text-rose-900 shadow-xs font-bold"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              <User className="w-3.5 h-3.5" />
+              Employee View
+            </button>
+            <button
+              onClick={() => switchRole("ADMIN")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                isAdmin
+                  ? "bg-rose-800 text-white shadow-xs font-bold"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              <ShieldCheck className="w-3.5 h-3.5" />
+              Admin View
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-bold">
+            <User className="w-3.5 h-3.5 text-emerald-600" />
+            Employee Portal
+          </div>
+        )}
 
-        {/* If in Employee mode, allow switching which employee you are currently simulating */}
-        {!isAdmin && employees.length > 0 && (
+        {/* If Admin is testing Employee mode, allow switching which employee you are inspecting */}
+        {isRealAdmin && !isAdmin && employees.length > 0 && (
           <div className="relative group">
             <div className="flex items-center gap-1.5 text-xs font-medium text-slate-600 bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 hover:border-slate-300 cursor-pointer shadow-2xs">
               <ArrowLeftRight className="w-3.5 h-3.5 text-slate-400" />
-              <span>Simulating: <strong className="text-slate-900">{currentUser?.name?.split(" ")[0]}</strong></span>
+              <span>Inspecting: <strong className="text-slate-900">{currentUser?.name?.split(" ")[0]}</strong></span>
               <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
             </div>
             <div className="absolute right-0 mt-1 w-56 bg-white border border-slate-200 rounded-xl shadow-lg p-1.5 hidden group-hover:block z-50 animate-in fade-in zoom-in-95 duration-100">
               <div className="text-[11px] font-semibold text-slate-400 px-2 py-1 uppercase tracking-wider">
-                Switch Employee
+                Switch Employee Profile
               </div>
               {employees
                 .filter((e) => e.role === "EMPLOYEE")

@@ -28,6 +28,7 @@ enum LeaveStatus {
 
 model User {
   id                    String          @id @default(cuid())
+  clerkId               String?         @unique
   employeeId            String          @unique // e.g. EMP-001
   name                  String
   email                 String          @unique // Official Email
