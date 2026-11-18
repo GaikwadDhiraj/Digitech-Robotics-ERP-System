@@ -18,7 +18,7 @@ import {
   CheckCircle2,
   AlertCircle,
   ShieldCheck,
-  DollarSign,
+  IndianRupee,
   Heart,
   Droplet,
   Landmark,
@@ -308,7 +308,7 @@ export default function EmployeeProfilePage() {
                     name="phone"
                     value={formData.phone}
                     onChange={handleChange}
-                    placeholder="+1 (555) 000-0000"
+                    placeholder="+91 98765 43210"
                     className="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
                   />
                 </div>
@@ -385,7 +385,7 @@ export default function EmployeeProfilePage() {
                     name="emergencyContact"
                     value={formData.emergencyContact}
                     onChange={handleChange}
-                    placeholder="Relative Name (+1 555-000-0000)"
+                    placeholder="e.g. Ramesh Gaikwad (+91 98765 43210)"
                     className="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
                   />
                 </div>
@@ -618,7 +618,7 @@ export default function EmployeeProfilePage() {
                     Annual Salary (CTC)
                   </div>
                   <div className="text-lg font-extrabold text-emerald-900 mt-1">
-                    ${Number(currentUser?.salary || 0).toLocaleString()} USD / annum
+                    ₹{Number(currentUser?.salary || 0).toLocaleString("en-IN")} / annum (INR)
                   </div>
                   <div className="text-[10px] text-emerald-700 mt-1 font-medium">
                     Configured by Admin / Payroll

@@ -118,3 +118,13 @@ model Holiday {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
+model Department {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  code        String   @unique
+  description String?
+  headName    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}

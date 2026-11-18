@@ -18,7 +18,7 @@ import {
   Trash2,
   X,
   Shield,
-  DollarSign,
+  IndianRupee,
   Calendar,
   Sparkles,
   ChevronRight,
@@ -81,9 +81,22 @@ export default function AdminEmployeesPage() {
     bio: "",
   });
 
+  const [departmentsList, setDepartmentsList] = useState([]);
+
   useEffect(() => {
     setEmployeeList(employees);
   }, [employees]);
+
+  useEffect(() => {
+    fetch("/api/departments")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && Array.isArray(data.data)) {
+          setDepartmentsList(data.data);
+        }
+      })
+      .catch((err) => console.error("Error loading departments:", err));
+  }, []);
 
   // Unique designations for filter dropdown
   const uniqueDesignations = Array.from(
@@ -92,12 +105,9 @@ export default function AdminEmployeesPage() {
 
   const departments = [
     "ALL",
-    "Engineering",
-    "UI/UX Design",
-    "Product Management",
-    "Operations & HR",
-    "Finance",
-    "Marketing",
+    ...(departmentsList.length > 0
+      ? departmentsList.map((d) => d.name)
+      : ["Robotics Engineering", "Industrial Automation", "Software Development", "Operations & HR", "Research & Development"]),
   ];
 
   const handleInputChange = (e) => {
@@ -107,13 +117,15 @@ export default function AdminEmployeesPage() {
 
   const openAddModal = () => {
     setEditingEmployee(null);
+    const count = employeeList.filter((e) => e.role === "EMPLOYEE").length;
+    const defaultDept = departmentsList[0]?.name || "Robotics Engineering";
     setFormData({
       name: "",
       email: "",
       personalEmail: "",
       phone: "",
-      employeeId: `EMP-${String(employeeList.length + 1).padStart(3, "0")}`,
-      department: "Engineering",
+      employeeId: `Digitech-Emp-${String(count + 1).padStart(3, "0")}`,
+      department: defaultDept,
       designation: "",
       role: "EMPLOYEE",
       status: "ACTIVE",
@@ -462,7 +474,7 @@ export default function AdminEmployeesPage() {
 
                         {/* Annual CTC */}
                         <td className="py-4 px-4 font-mono font-semibold text-slate-800">
-                          ${Number(emp.salary || 0).toLocaleString()}
+                          ₹{Number(emp.salary || 0).toLocaleString("en-IN")}
                         </td>
 
                         {/* Status & Activation Toggle */}
@@ -596,35 +608,46 @@ export default function AdminEmployeesPage() {
                     </div>
 
                     <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">
-                        Department
+                      <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center justify-between">
+                        <span>Department</span>
+                        <span className="text-[10px] text-rose-700 font-bold">From Organization</span>
                       </label>
                       <select
                         name="department"
                         value={formData.department}
                         onChange={handleInputChange}
-                        className="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2 text-slate-900 focus:ring-2 focus:ring-indigo-500"
+                        className="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2 text-slate-900 focus:ring-2 focus:ring-rose-500"
                       >
-                        <option value="Engineering">Engineering</option>
-                        <option value="UI/UX Design">UI/UX Design</option>
-                        <option value="Product Management">Product Management</option>
-                        <option value="Operations & HR">Operations & HR</option>
-                        <option value="Finance">Finance</option>
-                        <option value="Marketing">Marketing</option>
+                        {departmentsList.length > 0 ? (
+                          departmentsList.map((d) => (
+                            <option key={d.id} value={d.name}>
+                              {d.name} ({d.code})
+                            </option>
+                          ))
+                        ) : (
+                          <>
+                            <option value="Robotics Engineering">Robotics Engineering (ROB-ENG)</option>
+                            <option value="Industrial Automation">Industrial Automation (IND-AUTO)</option>
+                            <option value="Software Development">Software Development (SFT-DEV)</option>
+                            <option value="Operations & HR">Operations & HR (OPS-HR)</option>
+                            <option value="Research & Development">Research & Development (RND-DEPT)</option>
+                          </>
+                        )}
                       </select>
                     </div>
 
                     <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">
-                        Annual Salary (CTC in USD)
+                      <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1">
+                        <IndianRupee className="w-3 h-3 text-emerald-600" />
+                        <span>Annual Salary (CTC in ₹ INR)</span>
                       </label>
                       <input
                         type="number"
                         name="salary"
                         value={formData.salary}
                         onChange={handleInputChange}
-                        placeholder="95000"
-                        className="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2 text-slate-900 focus:ring-2 focus:ring-indigo-500"
+                        placeholder="e.g. 1200000 (₹12 LPA)"
+                        className="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2 text-slate-900 focus:ring-2 focus:ring-rose-500 font-mono"
                       />
                     </div>
 
@@ -718,8 +741,8 @@ export default function AdminEmployeesPage() {
                         name="phone"
                         value={formData.phone}
                         onChange={handleInputChange}
-                        placeholder="+1 (555) 123-4567"
-                        className="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2 text-slate-900 focus:ring-2 focus:ring-indigo-500"
+                        placeholder="+91 98765 43210"
+                        className="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2 text-slate-900 focus:ring-2 focus:ring-rose-500"
                       />
                     </div>
 
@@ -793,7 +816,7 @@ export default function AdminEmployeesPage() {
                         name="emergencyContact"
                         value={formData.emergencyContact}
                         onChange={handleInputChange}
-                        placeholder="Name & Contact No."
+                        placeholder="e.g. Ramesh Gaikwad (+91 98765 43210)"
                         className="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2 text-slate-900"
                       />
                     </div>
@@ -803,7 +826,7 @@ export default function AdminEmployeesPage() {
                 {/* 3. Statutory KYC */}
                 <div className="space-y-3">
                   <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5 pb-2 border-b border-slate-100">
-                    <FileBadge className="w-4 h-4 text-purple-600" /> Statutory KYC (Aadhaar & PAN)
+                    <FileBadge className="w-4 h-4 text-rose-600" /> Statutory KYC (Aadhaar &amp; PAN)
                   </h4>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -816,7 +839,7 @@ export default function AdminEmployeesPage() {
                         name="aadharNumber"
                         value={formData.aadharNumber}
                         onChange={handleInputChange}
-                        placeholder="1234 5678 9012"
+                        placeholder="5432 1098 7654 (12 digits)"
                         className="w-full text-xs font-mono bg-white border border-slate-200 rounded-xl px-3 py-2 text-slate-900"
                       />
                     </div>
@@ -830,7 +853,7 @@ export default function AdminEmployeesPage() {
                         name="panNumber"
                         value={formData.panNumber}
                         onChange={handleInputChange}
-                        placeholder="ABCDE1234F"
+                        placeholder="ABCDE1234F (10 characters)"
                         className="w-full text-xs font-mono uppercase bg-white border border-slate-200 rounded-xl px-3 py-2 text-slate-900"
                       />
                     </div>
@@ -840,7 +863,7 @@ export default function AdminEmployeesPage() {
                 {/* 4. Residential & Communication Addresses */}
                 <div className="space-y-3">
                   <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5 pb-2 border-b border-slate-100">
-                    <MapPin className="w-4 h-4 text-indigo-600" /> Addresses
+                    <MapPin className="w-4 h-4 text-rose-600" /> Addresses
                   </h4>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -853,7 +876,7 @@ export default function AdminEmployeesPage() {
                         rows="2"
                         value={formData.residentialAddress}
                         onChange={handleInputChange}
-                        placeholder="Street, City, State, PIN"
+                        placeholder="e.g. Flat 402, Shivajinagar, Pune, Maharashtra 411005"
                         className="w-full text-xs bg-white border border-slate-200 rounded-xl p-2.5 text-slate-900"
                       />
                     </div>
@@ -867,7 +890,7 @@ export default function AdminEmployeesPage() {
                         rows="2"
                         value={formData.communicationAddress}
                         onChange={handleInputChange}
-                        placeholder="Courier/Present mailing address"
+                        placeholder="e.g. Flat 402, Shivajinagar, Pune, Maharashtra 411005"
                         className="w-full text-xs bg-white border border-slate-200 rounded-xl p-2.5 text-slate-900"
                       />
                     </div>
@@ -904,7 +927,7 @@ export default function AdminEmployeesPage() {
                         name="bankName"
                         value={formData.bankName}
                         onChange={handleInputChange}
-                        placeholder="e.g. HDFC / Chase"
+                        placeholder="e.g. State Bank of India / HDFC Bank"
                         className="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2 text-slate-900"
                       />
                     </div>
@@ -918,21 +941,21 @@ export default function AdminEmployeesPage() {
                         name="bankAccountNumber"
                         value={formData.bankAccountNumber}
                         onChange={handleInputChange}
-                        placeholder="000123456789"
+                        placeholder="e.g. 123456789012"
                         className="w-full text-xs font-mono bg-white border border-slate-200 rounded-xl px-3 py-2 text-slate-900"
                       />
                     </div>
 
                     <div className="sm:col-span-2">
                       <label className="block text-xs font-semibold text-slate-700 mb-1">
-                        IFSC / Routing Code
+                        IFSC Code
                       </label>
                       <input
                         type="text"
                         name="bankIfscCode"
                         value={formData.bankIfscCode}
                         onChange={handleInputChange}
-                        placeholder="HDFC0001234"
+                        placeholder="e.g. SBIN0001234 / HDFC0004567"
                         className="w-full text-xs font-mono uppercase bg-white border border-slate-200 rounded-xl px-3 py-2 text-slate-900"
                       />
                     </div>
@@ -1001,7 +1024,7 @@ export default function AdminEmployeesPage() {
                   </div>
                   <div>
                     <span className="text-[10px] text-slate-400 font-bold uppercase">Annual CTC</span>
-                    <div className="font-bold text-emerald-700">${Number(viewingProfile.salary || 0).toLocaleString()}</div>
+                    <div className="font-bold text-emerald-700">₹{Number(viewingProfile.salary || 0).toLocaleString("en-IN")}</div>
                   </div>
                   <div>
                     <span className="text-[10px] text-slate-400 font-bold uppercase">Status</span>

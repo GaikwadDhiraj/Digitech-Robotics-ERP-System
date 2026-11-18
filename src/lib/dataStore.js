@@ -49,20 +49,29 @@ const fixedHolidays = [
   { id: "h-9", name: "Christmas Day", date: "2026-12-25", type: "FESTIVAL" },
 ];
 
+// Default Departments for the organization
+const defaultDepartments = [
+  { id: "dept-1", name: "Robotics Engineering", code: "ROB-ENG", description: "Design, prototyping, and assembly of robotic systems.", headName: "Dhiraj Gaikwad" },
+  { id: "dept-2", name: "Industrial Automation", code: "IND-AUTO", description: "PLC programming, SCADA, and factory automated cells.", headName: "Automation Lead" },
+  { id: "dept-3", name: "Software Development", code: "SFT-DEV", description: "Cloud software, ERP, firmware, and AI algorithms.", headName: "Software Lead" },
+  { id: "dept-4", name: "Operations & HR", code: "OPS-HR", description: "Human resources, workplace administration, and compliance.", headName: "Operations Head" },
+  { id: "dept-5", name: "Research & Development", code: "RND-DEPT", description: "Next-gen autonomous mobile robots and computer vision.", headName: "R&D Lead" },
+];
+
 // Initial Admin Account
 const initialEmployees = [
   {
     id: "admin-1",
-    employeeId: "ADM-001",
+    employeeId: "Digitech-Adm-001",
     name: "Dhiraj Gaikwad",
     email: "dvgaikwad333@gmail.com",
     personalEmail: "dvgaikwad333@gmail.com",
-    phone: "",
+    phone: "+91 98765 43210",
     department: "Administration",
     designation: "Administrator / MD",
     role: "ADMIN",
     status: "ACTIVE",
-    salary: 150000,
+    salary: 1500000,
     joinDate: new Date("2023-01-01").toISOString(),
     bio: "Digitech Robotics Administrator",
     avatarUrl: "",
@@ -110,6 +119,9 @@ if (!globalMemory.__ERP_LEAVES__) {
 }
 if (!globalMemory.__ERP_HOLIDAYS__) {
   globalMemory.__ERP_HOLIDAYS__ = [...fixedHolidays];
+}
+if (!globalMemory.__ERP_DEPARTMENTS__) {
+  globalMemory.__ERP_DEPARTMENTS__ = [...defaultDepartments];
 }
 
 // Helper to check if Prisma has a working database connection
@@ -167,14 +179,30 @@ export const dataStore = {
   },
 
   async createEmployee(data) {
+    let generatedId = data.employeeId;
+    if (!generatedId) {
+      if (await isPrismaAvailable()) {
+        try {
+          const empCount = await prisma.user.count({ where: { role: "EMPLOYEE" } });
+          generatedId = `Digitech-Emp-${String(empCount + 1).padStart(3, "0")}`;
+        } catch (e) {
+          const empCount = globalMemory.__ERP_EMPLOYEES__.filter((e) => e.role === "EMPLOYEE").length;
+          generatedId = `Digitech-Emp-${String(empCount + 1).padStart(3, "0")}`;
+        }
+      } else {
+        const empCount = globalMemory.__ERP_EMPLOYEES__.filter((e) => e.role === "EMPLOYEE").length;
+        generatedId = `Digitech-Emp-${String(empCount + 1).padStart(3, "0")}`;
+      }
+    }
+
     const newEmp = {
       id: "emp-" + Date.now(),
-      employeeId: data.employeeId || `EMP-${String(globalMemory.__ERP_EMPLOYEES__.length + 1).padStart(3, "0")}`,
+      employeeId: generatedId,
       name: data.name,
       email: data.email,
       personalEmail: data.personalEmail || "",
       phone: data.phone || "",
-      department: data.department || "Engineering",
+      department: data.department || "Robotics Engineering",
       designation: data.designation,
       role: data.role || "EMPLOYEE",
       status: data.status || "ACTIVE",
@@ -508,5 +536,107 @@ export const dataStore = {
   // HOLIDAYS
   async getHolidays() {
     return globalMemory.__ERP_HOLIDAYS__;
+  },
+
+  // DEPARTMENT METHODS
+  async getDepartments() {
+    if (await isPrismaAvailable()) {
+      try {
+        return await prisma.department.findMany({
+          orderBy: { createdAt: "asc" },
+        });
+      } catch (err) {
+        console.warn("Prisma fallback for departments:", err.message);
+      }
+    }
+    return globalMemory.__ERP_DEPARTMENTS__;
+  },
+
+  async getDepartmentById(id) {
+    if (await isPrismaAvailable()) {
+      try {
+        return await prisma.department.findUnique({
+          where: { id },
+        });
+      } catch (err) {
+        console.warn("Prisma fallback:", err.message);
+      }
+    }
+    return globalMemory.__ERP_DEPARTMENTS__.find((d) => d.id === id) || null;
+  },
+
+  async createDepartment(data) {
+    const newDept = {
+      id: "dept-" + Date.now(),
+      name: data.name,
+      code: (data.code || data.name.substring(0, 4)).toUpperCase().trim(),
+      description: data.description || "",
+      headName: data.headName || "",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    if (await isPrismaAvailable()) {
+      try {
+        const created = await prisma.department.create({
+          data: {
+            name: newDept.name,
+            code: newDept.code,
+            description: newDept.description,
+            headName: newDept.headName,
+          },
+        });
+        return created;
+      } catch (err) {
+        console.warn("Prisma create department fallback:", err.message);
+      }
+    }
+
+    globalMemory.__ERP_DEPARTMENTS__.push(newDept);
+    return newDept;
+  },
+
+  async updateDepartment(id, data) {
+    if (await isPrismaAvailable()) {
+      try {
+        return await prisma.department.update({
+          where: { id },
+          data: {
+            name: data.name,
+            code: data.code ? data.code.toUpperCase().trim() : undefined,
+            description: data.description,
+            headName: data.headName,
+          },
+        });
+      } catch (err) {
+        console.warn("Prisma update department fallback:", err.message);
+      }
+    }
+
+    const index = globalMemory.__ERP_DEPARTMENTS__.findIndex((d) => d.id === id);
+    if (index === -1) return null;
+    globalMemory.__ERP_DEPARTMENTS__[index] = {
+      ...globalMemory.__ERP_DEPARTMENTS__[index],
+      ...data,
+      code: data.code ? data.code.toUpperCase().trim() : globalMemory.__ERP_DEPARTMENTS__[index].code,
+      updatedAt: new Date().toISOString(),
+    };
+    return globalMemory.__ERP_DEPARTMENTS__[index];
+  },
+
+  async deleteDepartment(id) {
+    if (await isPrismaAvailable()) {
+      try {
+        await prisma.department.delete({ where: { id } });
+        return true;
+      } catch (err) {
+        console.warn("Prisma delete department fallback:", err.message);
+      }
+    }
+
+    const index = globalMemory.__ERP_DEPARTMENTS__.findIndex((d) => d.id === id);
+    if (index === -1) return false;
+    globalMemory.__ERP_DEPARTMENTS__.splice(index, 1);
+    return true;
   },
 };

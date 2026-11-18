@@ -456,7 +456,7 @@ export default function EmployeeLeavePage() {
                     name="contactDuringLeave"
                     value={formData.contactDuringLeave}
                     onChange={handleInputChange}
-                    placeholder="Location / Address & Emergency Mobile No."
+                    placeholder="e.g. Pune Residence, +91 98765 43210"
                     className="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2 text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
                   />
                 </div>

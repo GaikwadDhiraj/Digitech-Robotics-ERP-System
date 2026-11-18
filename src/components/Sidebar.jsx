@@ -15,6 +15,7 @@ import {
   Briefcase,
   ChevronRight,
   Sparkles,
+  Building2,
 } from "lucide-react";
 
 export default function Sidebar() {
@@ -33,6 +34,12 @@ export default function Sidebar() {
       href: "/admin/employees",
       icon: Users,
       badge: "Staff Directory",
+    },
+    {
+      title: "Organization",
+      href: "/admin/organization",
+      icon: Building2,
+      badge: "Departments",
     },
     {
       title: "Leave Sanctions",

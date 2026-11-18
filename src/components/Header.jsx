@@ -80,39 +80,6 @@ export default function Header() {
           </div>
         )}
 
-        {/* If Admin is testing Employee mode, allow switching which employee you are inspecting */}
-        {isRealAdmin && !isAdmin && employees.length > 0 && (
-          <div className="relative group">
-            <div className="flex items-center gap-1.5 text-xs font-medium text-slate-600 bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 hover:border-slate-300 cursor-pointer shadow-2xs">
-              <ArrowLeftRight className="w-3.5 h-3.5 text-slate-400" />
-              <span>Inspecting: <strong className="text-slate-900">{currentUser?.name?.split(" ")[0]}</strong></span>
-              <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
-            </div>
-            <div className="absolute right-0 mt-1 w-56 bg-white border border-slate-200 rounded-xl shadow-lg p-1.5 hidden group-hover:block z-50 animate-in fade-in zoom-in-95 duration-100">
-              <div className="text-[11px] font-semibold text-slate-400 px-2 py-1 uppercase tracking-wider">
-                Switch Employee Profile
-              </div>
-              {employees
-                .filter((e) => e.role === "EMPLOYEE")
-                .map((emp) => (
-                  <button
-                    key={emp.id}
-                    onClick={() => switchEmployeeUser(emp.id)}
-                    className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs flex items-center justify-between hover:bg-rose-50 transition cursor-pointer ${
-                      currentUser?.id === emp.id ? "bg-rose-50 text-rose-900 font-bold" : "text-slate-700"
-                    }`}
-                  >
-                    <div>
-                      <div className="font-medium">{emp.name}</div>
-                      <div className="text-[10px] text-slate-400">{emp.designation}</div>
-                    </div>
-                    <span className="text-[10px] font-mono bg-slate-100 px-1 rounded">{emp.employeeId}</span>
-                  </button>
-                ))}
-            </div>
-          </div>
-        )}
-
         {/* Current User Badge with Photo Editor on Click */}
         <div className="flex items-center gap-3 pl-3 border-l border-slate-200">
           <button

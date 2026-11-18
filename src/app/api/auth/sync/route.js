@@ -59,7 +59,7 @@ export async function POST(request) {
         // Create Admin if not present
         admin = await prisma.user.create({
           data: {
-            employeeId: "ADM-001",
+            employeeId: "Digitech-Adm-001",
             clerkId,
             name: "Dhiraj Gaikwad",
             email: normalizedEmail,
@@ -206,7 +206,7 @@ export async function GET() {
       if (!admin) {
         admin = await prisma.user.create({
           data: {
-            employeeId: "ADM-001",
+            employeeId: "Digitech-Adm-001",
             clerkId,
             name: "Dhiraj Gaikwad",
             email: normalizedEmail,
