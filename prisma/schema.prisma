@@ -1,0 +1,119 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  EMPLOYEE
+}
+
+enum EmployeeStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model User {
+  id                    String          @id @default(cuid())
+  employeeId            String          @unique // e.g. EMP-001
+  name                  String
+  email                 String          @unique // Official Email
+  personalEmail         String?
+  phone                 String?
+  department            String          @default("Engineering")
+  designation           String          // Assigned by Admin
+  role                  Role            @default(EMPLOYEE)
+  status                EmployeeStatus  @default(ACTIVE)
+  salary                Float?          // Annual CTC
+  joinDate              DateTime        @default(now())
+  dob                   DateTime?       // Date of Birth
+  gender                String?         // Male, Female, Other
+  maritalStatus         String?         // Single, Married, etc.
+  bloodGroup            String?         // A+, B+, O+, AB+, etc.
+  aadharNumber          String?         // 12 digit Aadhaar
+  panNumber             String?         // 10 char PAN
+  residentialAddress    String?         // Permanent Address
+  communicationAddress  String?         // Correspondence Address
+  bankAccountName       String?         // Bank A/C Holder Name
+  bankAccountNumber     String?         // Bank A/C Number
+  bankIfscCode          String?         // IFSC Code
+  bankName              String?         // Bank Name
+  emergencyContact      String?
+  avatarUrl             String?
+  bio                   String?
+  leaves                LeaveRequest[]
+  leaveBalances         LeaveBalance[]
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+}
+
+model LeaveTypePolicy {
+  id                  String   @id @default(cuid())
+  name                String   @unique // e.g. "Sick Leave", "Casual Leave"
+  code                String   @unique // e.g. "SL", "CL"
+  defaultDaysPerYear  Float    @default(12)
+  description         String?
+  color               String?  @default("indigo")
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+model LeaveBalance {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  year           Int      @default(2026) // 1 Jan to 31 Dec
+  leaveType      String   // e.g. "Casual Leave", "Sick Leave"
+  allocatedDays  Float    @default(12)
+  usedDays       Float    @default(0)
+  remainingDays  Float    @default(12)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([userId, year, leaveType])
+}
+
+model LeaveRequest {
+  id                  String      @id @default(cuid())
+  userId              String
+  user                User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  leaveType           String      // e.g., Casual Leave, Sick Leave, Paid Leave
+  startDate           DateTime
+  endDate             DateTime
+  isHalfDay           Boolean     @default(false)
+  halfDayType         String?     // "FIRST_HALF" or "SECOND_HALF"
+  daysCount           Float       // 0.5 for half day, or 1, 2, etc.
+  reason              String
+  inchargePerson      String?     // Person incharge in absence (optional)
+  contactDuringLeave  String?     // Address and contact number during leave
+  documentUrl         String?     // Uploaded document (optional)
+  documentName        String?
+  status              LeaveStatus @default(PENDING)
+  actionNotes         String?     // Admin's remarks when approving/rejecting
+  actionDate          DateTime?
+  actionBy            String?     // Admin name or ID
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+}
+
+model Holiday {
+  id        String   @id @default(cuid())
+  name      String
+  date      DateTime
+  type      String   @default("NATIONAL") // NATIONAL, FESTIVAL, COMPANY
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
