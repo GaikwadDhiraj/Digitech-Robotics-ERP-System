@@ -15,7 +15,12 @@ const geistMono = Geist_Mono({
 
 export const metadata = {
   title: "Digitech ERP System",
-  description: "Enterprise Resource Planning - Employee and Admin Management System",
+  description: "Enterprise Resource Planning - Digitech Robotics India Pvt. Ltd.",
+  icons: {
+    icon: "/logo.jpg",
+    shortcut: "/logo.jpg",
+    apple: "/logo.jpg",
+  },
 };
 
 export default function RootLayout({ children }) {

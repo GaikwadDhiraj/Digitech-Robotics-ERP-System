@@ -29,16 +29,18 @@ export default function Header() {
     <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 px-6 py-3 flex items-center justify-between shadow-xs">
       {/* Left: Brand with DigiTech Robotics colors */}
       <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-linear-to-tr from-rose-900 via-rose-800 to-rose-700 flex items-center justify-center text-white shadow-md shadow-rose-950/20">
-          <Building2 className="w-5 h-5" />
-        </div>
+        <img
+          src="/logo.jpg"
+          alt="Digitech Robotics India Pvt. Ltd."
+          className="w-10 h-10 rounded-full object-cover shadow-md shadow-rose-950/20 border border-rose-200"
+        />
         <div>
           <div className="flex items-center gap-2">
             <span className="font-extrabold text-lg text-slate-900 tracking-tight">
-              DigiTech <span className="text-rose-700">ERP</span>
+              Digitech <span className="text-rose-700">Robotics</span>
             </span>
             <span className="text-[10px] px-2 py-0.5 rounded-full font-mono font-bold bg-rose-50 text-rose-800 border border-rose-200">
-              Robotics Suite
+              India Pvt. Ltd.
             </span>
           </div>
           <p className="text-[11px] text-slate-500">Enterprise Staff, Attendance & Leave Management</p>

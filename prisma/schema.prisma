@@ -57,6 +57,7 @@ model User {
   bio                   String?
   leaves                LeaveRequest[]
   leaveBalances         LeaveBalance[]
+  compOffRequests       CompOffRequest[]
   createdAt             DateTime        @default(now())
   updatedAt             DateTime        @updatedAt
 }
@@ -127,4 +128,21 @@ model Department {
   headName    String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+model CompOffRequest {
+  id            String      @id @default(cuid())
+  userId        String
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date          DateTime
+  entryTime     String      @default("09:30 AM")
+  exitTime      String      @default("06:30 PM")
+  hoursWorked   Float       @default(8.0)
+  reason        String
+  status        LeaveStatus @default(PENDING) // PENDING, APPROVED, REJECTED
+  actionNotes   String?
+  actionDate    DateTime?
+  actionBy      String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
 }

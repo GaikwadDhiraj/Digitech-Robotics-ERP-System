@@ -30,15 +30,17 @@ export default function HomePage() {
       {/* Top Navbar */}
       <header className="border-b border-slate-900 px-6 py-4 flex items-center justify-between max-w-7xl mx-auto w-full">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-linear-to-tr from-rose-900 via-rose-800 to-rose-700 flex items-center justify-center text-white shadow-lg shadow-rose-950/40">
-            <Building2 className="w-5 h-5" />
-          </div>
+          <img
+            src="/logo.jpg"
+            alt="Digitech Robotics Logo"
+            className="w-10 h-10 rounded-full object-cover shadow-lg shadow-rose-950/40 border border-rose-500/40"
+          />
           <div>
             <span className="font-extrabold text-lg text-white tracking-tight">
-              DigiTech <span className="text-rose-500">ERP</span>
+              Digitech <span className="text-rose-500">Robotics</span>
             </span>
             <span className="ml-2 text-[10px] px-2 py-0.5 rounded-full font-mono bg-rose-950 text-rose-300 border border-rose-800/60 font-bold">
-              Robotics Suite
+              India Pvt. Ltd.
             </span>
           </div>
         </div>

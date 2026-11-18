@@ -123,6 +123,9 @@ if (!globalMemory.__ERP_HOLIDAYS__) {
 if (!globalMemory.__ERP_DEPARTMENTS__) {
   globalMemory.__ERP_DEPARTMENTS__ = [...defaultDepartments];
 }
+if (!globalMemory.__ERP_COMP_OFFS__) {
+  globalMemory.__ERP_COMP_OFFS__ = [];
+}
 
 // Helper to check if Prisma has a working database connection
 async function isPrismaAvailable() {
@@ -638,5 +641,188 @@ export const dataStore = {
     if (index === -1) return false;
     globalMemory.__ERP_DEPARTMENTS__.splice(index, 1);
     return true;
+  },
+
+  // COMPENSATORY OFF (COMP OFF) METHODS
+  async getCompOffRequests(userId = null) {
+    if (await isPrismaAvailable()) {
+      try {
+        const where = userId ? { userId } : {};
+        return await prisma.compOffRequest.findMany({
+          where,
+          include: {
+            user: {
+              select: {
+                id: true,
+                employeeId: true,
+                name: true,
+                email: true,
+                department: true,
+                designation: true,
+                avatarUrl: true,
+              },
+            },
+          },
+          orderBy: { date: "desc" },
+        });
+      } catch (err) {
+        console.warn("Prisma compOff get fallback:", err.message);
+      }
+    }
+
+    let items = globalMemory.__ERP_COMP_OFFS__;
+    if (userId) {
+      items = items.filter((c) => c.userId === userId);
+    }
+    return items.map((c) => {
+      const user = globalMemory.__ERP_EMPLOYEES__.find((e) => e.id === c.userId);
+      return { ...c, user };
+    });
+  },
+
+  async createCompOffRequest(data) {
+    const newClaim = {
+      id: "compoff-" + Date.now(),
+      userId: data.userId,
+      date: new Date(data.date).toISOString(),
+      entryTime: data.entryTime || "09:30 AM",
+      exitTime: data.exitTime || "06:30 PM",
+      hoursWorked: parseFloat(data.hoursWorked) || 8.0,
+      reason: data.reason || "Worked on official duties during weekend/holiday.",
+      status: "PENDING",
+      actionNotes: null,
+      actionDate: null,
+      actionBy: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    if (await isPrismaAvailable()) {
+      try {
+        const created = await prisma.compOffRequest.create({
+          data: {
+            userId: data.userId,
+            date: new Date(data.date),
+            entryTime: newClaim.entryTime,
+            exitTime: newClaim.exitTime,
+            hoursWorked: newClaim.hoursWorked,
+            reason: newClaim.reason,
+            status: "PENDING",
+          },
+          include: {
+            user: {
+              select: {
+                id: true,
+                employeeId: true,
+                name: true,
+                email: true,
+                department: true,
+                designation: true,
+              },
+            },
+          },
+        });
+        return created;
+      } catch (err) {
+        console.warn("Prisma compOff create fallback:", err.message);
+      }
+    }
+
+    globalMemory.__ERP_COMP_OFFS__.push(newClaim);
+    const user = globalMemory.__ERP_EMPLOYEES__.find((e) => e.id === newClaim.userId);
+    return { ...newClaim, user };
+  },
+
+  async updateCompOffStatus(id, { status, actionNotes, actionBy }) {
+    if (await isPrismaAvailable()) {
+      try {
+        const updated = await prisma.compOffRequest.update({
+          where: { id },
+          data: {
+            status,
+            actionNotes: actionNotes || null,
+            actionBy: actionBy || "Administrator",
+            actionDate: new Date(),
+          },
+          include: {
+            user: true,
+          },
+        });
+
+        // If APPROVED, credit exactly +1 Comp Off leave day to the employee's LeaveBalance!
+        if (status === "APPROVED") {
+          await prisma.leaveBalance.upsert({
+            where: {
+              userId_year_leaveType: {
+                userId: updated.userId,
+                year: 2026,
+                leaveType: "Compensatory Off",
+              },
+            },
+            update: {
+              allocatedDays: { increment: 1 },
+              remainingDays: { increment: 1 },
+            },
+            create: {
+              userId: updated.userId,
+              year: 2026,
+              leaveType: "Compensatory Off",
+              allocatedDays: 1,
+              usedDays: 0,
+              remainingDays: 1,
+            },
+          });
+        }
+
+        return updated;
+      } catch (err) {
+        console.warn("Prisma compOff update fallback:", err.message);
+      }
+    }
+
+    const index = globalMemory.__ERP_COMP_OFFS__.findIndex((c) => c.id === id);
+    if (index === -1) return null;
+
+    globalMemory.__ERP_COMP_OFFS__[index] = {
+      ...globalMemory.__ERP_COMP_OFFS__[index],
+      status,
+      actionNotes: actionNotes || null,
+      actionBy: actionBy || "Administrator",
+      actionDate: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    const claim = globalMemory.__ERP_COMP_OFFS__[index];
+
+    // If APPROVED, credit +1 to in-memory balance
+    if (status === "APPROVED") {
+      const balIndex = globalMemory.__ERP_BALANCES__.findIndex(
+        (b) => b.userId === claim.userId && b.year === 2026 && (b.leaveType === "Compensatory Off" || b.leaveType === "Comp Off")
+      );
+      if (balIndex !== -1) {
+        const bal = globalMemory.__ERP_BALANCES__[balIndex];
+        globalMemory.__ERP_BALANCES__[balIndex] = {
+          ...bal,
+          allocatedDays: bal.allocatedDays + 1,
+          remainingDays: bal.remainingDays + 1,
+          updatedAt: new Date().toISOString(),
+        };
+      } else {
+        globalMemory.__ERP_BALANCES__.push({
+          id: `bal-${claim.userId}-CO-${Date.now()}`,
+          userId: claim.userId,
+          year: 2026,
+          leaveType: "Compensatory Off",
+          allocatedDays: 1,
+          usedDays: 0,
+          remainingDays: 1,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+      }
+    }
+
+    const user = globalMemory.__ERP_EMPLOYEES__.find((e) => e.id === claim.userId);
+    return { ...claim, user };
   },
 };

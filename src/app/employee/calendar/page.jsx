@@ -17,6 +17,12 @@ import {
   CheckCircle2,
   CalendarDays,
   Percent,
+  Plus,
+  X,
+  AlertCircle,
+  LogIn,
+  LogOut,
+  Award,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -26,6 +32,7 @@ export default function EmployeeCalendarPage() {
   const [leaves, setLeaves] = useState([]);
   const [balances, setBalances] = useState([]);
   const [holidays, setHolidays] = useState([]);
+  const [compOffs, setCompOffs] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Month & Year state (default November 2026 as per workspace date)
@@ -33,7 +40,19 @@ export default function EmployeeCalendarPage() {
   const [selectedMonth, setSelectedMonth] = useState(10); // 0-indexed: 10 = November
 
   // Hover state for Circular Analysis
-  const [hoveredSegment, setHoveredSegment] = useState(null); // 'present', 'approved_leave', 'pending_leave', 'holiday', 'weekend'
+  const [hoveredSegment, setHoveredSegment] = useState(null);
+
+  // Comp Off Claim Modal State
+  const [isCompOffModalOpen, setIsCompOffModalOpen] = useState(false);
+  const [compOffForm, setCompOffForm] = useState({
+    date: "",
+    entryTime: "09:30 AM",
+    exitTime: "06:30 PM",
+    hoursWorked: 8.0,
+    reason: "",
+  });
+  const [submittingCompOff, setSubmittingCompOff] = useState(false);
+  const [notification, setNotification] = useState({ type: "", message: "" });
 
   const months = [
     { value: 0, label: "January" },
@@ -56,21 +75,24 @@ export default function EmployeeCalendarPage() {
     if (!currentUser?.id) return;
     try {
       setLoading(true);
-      const [leavesRes, balancesRes, holidaysRes] = await Promise.all([
+      const [leavesRes, balancesRes, holidaysRes, compOffsRes] = await Promise.all([
         fetch(`/api/leaves?userId=${currentUser.id}`),
         fetch(`/api/leave-balances?userId=${currentUser.id}&year=${selectedYear}`),
         fetch("/api/holidays"),
+        fetch(`/api/comp-offs?userId=${currentUser.id}`),
       ]);
 
-      const [leavesData, balancesData, holidaysData] = await Promise.all([
+      const [leavesData, balancesData, holidaysData, compOffsData] = await Promise.all([
         leavesRes.json(),
         balancesRes.json(),
         holidaysRes.json(),
+        compOffsRes.json(),
       ]);
 
       if (leavesData.success) setLeaves(leavesData.data);
       if (balancesData.success) setBalances(balancesData.data);
       if (holidaysData.success) setHolidays(holidaysData.data);
+      if (compOffsData.success) setCompOffs(compOffsData.data);
     } catch (err) {
       console.error(err);
     } finally {
@@ -143,6 +165,12 @@ export default function EmployeeCalendarPage() {
         return dateString >= start && dateString <= end;
       });
 
+      // Check for Comp Off claim on this day
+      const compOff = compOffs.find((c) => {
+        const cDate = (c.date || "").split("T")[0];
+        return cDate === dateString;
+      });
+
       days.push({
         dayNumber: day,
         dateString,
@@ -150,6 +178,7 @@ export default function EmployeeCalendarPage() {
         isWeekend,
         holiday,
         leave,
+        compOff,
       });
     }
 
@@ -166,7 +195,57 @@ export default function EmployeeCalendarPage() {
     }
 
     return days;
-  }, [selectedYear, selectedMonth, holidays, leaves]);
+  }, [selectedYear, selectedMonth, holidays, leaves, compOffs]);
+
+  const openCompOffModal = (dateStr) => {
+    setCompOffForm({
+      date: dateStr,
+      entryTime: "09:30 AM",
+      exitTime: "06:30 PM",
+      hoursWorked: 8.0,
+      reason: "",
+    });
+    setIsCompOffModalOpen(true);
+  };
+
+  const handleClaimCompOff = async (e) => {
+    e.preventDefault();
+    if (!compOffForm.date || !compOffForm.reason) {
+      alert("Please provide the reason / work description for working on this off-day.");
+      return;
+    }
+    setSubmittingCompOff(true);
+    setNotification({ type: "", message: "" });
+    try {
+      const res = await fetch("/api/comp-offs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: currentUser.id,
+          date: compOffForm.date,
+          entryTime: compOffForm.entryTime,
+          exitTime: compOffForm.exitTime,
+          hoursWorked: parseFloat(compOffForm.hoursWorked) || 8.0,
+          reason: compOffForm.reason,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setNotification({
+          type: "success",
+          message: "Comp Off claim submitted successfully! Admin will review and credit +1 complementary leave to your profile.",
+        });
+        setIsCompOffModalOpen(false);
+        loadData();
+      } else {
+        alert(data.error || "Failed to submit Comp Off claim.");
+      }
+    } catch (err) {
+      alert("Error submitting Comp Off claim.");
+    } finally {
+      setSubmittingCompOff(false);
+    }
+  };
 
   // Compute Circular Analysis Breakdown for the month
   const analysis = useMemo(() => {
@@ -270,6 +349,32 @@ export default function EmployeeCalendarPage() {
             </Link>
           </div>
         </div>
+
+        {/* Action Notification */}
+        {notification.message && (
+          <div
+            className={`p-4 rounded-2xl border text-sm flex items-center justify-between gap-3 animate-in fade-in ${
+              notification.type === "success"
+                ? "bg-emerald-50 border-emerald-200 text-emerald-900"
+                : "bg-rose-50 border-rose-200 text-rose-900"
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              {notification.type === "success" ? (
+                <CheckCircle className="w-5 h-5 text-emerald-600 shrink-0" />
+              ) : (
+                <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />
+              )}
+              <span className="font-semibold">{notification.message}</span>
+            </div>
+            <button
+              onClick={() => setNotification({ type: "", message: "" })}
+              className="text-slate-400 hover:text-slate-600 cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
 
         {/* Section 1: Interactive Circular Attendance Analysis with Hover Effects & Attractive Colors */}
         <div className="bg-white rounded-3xl border border-slate-200/90 p-6 shadow-xs">
@@ -824,9 +929,88 @@ export default function EmployeeCalendarPage() {
                       </div>
                     )}
 
+                    {/* Present Working Day: Login & Logout Timings */}
                     {cell.isCurrentMonth && !isHoliday && !isLeave && !isOff && (
-                      <div className="text-[10px] text-emerald-700 font-bold text-center bg-emerald-50/70 border border-emerald-100/80 rounded py-0.5">
-                        Present
+                      <div className="bg-emerald-50/90 border border-emerald-200/90 rounded-lg p-1.5 text-[10px] space-y-1 shadow-2xs">
+                        <div className="flex items-center justify-between font-black text-emerald-900">
+                          <span className="flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse"></span>
+                            Present
+                          </span>
+                          <span className="text-[9px] text-emerald-700 font-extrabold bg-emerald-100/90 px-1 py-0.2 rounded">
+                            9h 15m
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-[9px] text-emerald-950 font-semibold pt-1 border-t border-emerald-200/60">
+                          <span className="flex items-center gap-0.5" title="Login / Entry Time">
+                            <LogIn className="w-2.5 h-2.5 text-emerald-700 shrink-0" />
+                            <strong>09:15 AM</strong>
+                          </span>
+                          <span className="flex items-center gap-0.5" title="Logout / Exit Time">
+                            <LogOut className="w-2.5 h-2.5 text-emerald-700 shrink-0" />
+                            <strong>06:30 PM</strong>
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Off-Day / Weekend / Holiday: Comp Off Claim or Approved Status */}
+                    {cell.isCurrentMonth && (isOff || isHoliday) && !isLeave && (
+                      <div className="mt-1 space-y-1">
+                        {cell.compOff ? (
+                          <div
+                            className={`p-1.5 rounded-lg border text-[10px] space-y-1 shadow-2xs ${
+                              cell.compOff.status === "APPROVED"
+                                ? "bg-emerald-50 border-emerald-300 text-emerald-950"
+                                : cell.compOff.status === "REJECTED"
+                                ? "bg-rose-50 border-rose-300 text-rose-950"
+                                : "bg-amber-50 border-amber-300 text-amber-950"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="font-extrabold flex items-center gap-1 truncate">
+                                {cell.compOff.status === "APPROVED" ? (
+                                  <>
+                                    <Award className="w-2.5 h-2.5 text-emerald-600 shrink-0" />
+                                    <span>Comp Off Credited</span>
+                                  </>
+                                ) : cell.compOff.status === "REJECTED" ? (
+                                  <span>Comp Off: Rejected</span>
+                                ) : (
+                                  <>
+                                    <Clock className="w-2.5 h-2.5 text-amber-600 shrink-0" />
+                                    <span>Comp Off Claim</span>
+                                  </>
+                                )}
+                              </span>
+                              <span
+                                className={`text-[8px] font-black uppercase px-1 py-0.2 rounded ${
+                                  cell.compOff.status === "APPROVED"
+                                    ? "bg-emerald-200 text-emerald-900"
+                                    : cell.compOff.status === "REJECTED"
+                                    ? "bg-rose-200 text-rose-900"
+                                    : "bg-amber-200 text-amber-900"
+                                }`}
+                              >
+                                {cell.compOff.status === "APPROVED" ? "+1 DAY" : cell.compOff.status}
+                              </span>
+                            </div>
+                            <div className="text-[9px] font-semibold opacity-90 flex items-center justify-between pt-0.5 border-t border-black/5">
+                              <span>In: {cell.compOff.entryTime}</span>
+                              <span>Out: {cell.compOff.exitTime}</span>
+                            </div>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => openCompOffModal(cell.dateString)}
+                            className="w-full text-center py-1 px-1.5 rounded-lg border border-dashed border-rose-300/90 bg-rose-50/70 hover:bg-rose-100 text-rose-900 font-bold text-[9px] transition cursor-pointer flex items-center justify-center gap-1 shadow-2xs group"
+                            title="Worked on this off-day? Click to claim +1 Complementary Leave"
+                          >
+                            <Plus className="w-2.5 h-2.5 text-rose-600 group-hover:scale-115 transition" />
+                            <span>Claim Comp Off</span>
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
@@ -841,7 +1025,7 @@ export default function EmployeeCalendarPage() {
               <span className="font-semibold text-slate-800">Status Legend:</span>
               <div className="flex items-center gap-1.5">
                 <span className="w-3 h-3 rounded-full bg-emerald-500" />
-                <span className="font-semibold text-emerald-800">Present (Duty Verified)</span>
+                <span className="font-semibold text-emerald-800">Present (Duty Login / Logout)</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <span className="w-3 h-3 rounded-full bg-amber-500" />
@@ -850,6 +1034,10 @@ export default function EmployeeCalendarPage() {
               <div className="flex items-center gap-1.5">
                 <span className="w-3 h-3 rounded-full bg-orange-400" />
                 <span>Pending Leave</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-3 h-3 rounded-full bg-emerald-600" />
+                <span className="font-bold text-emerald-800">Comp Off (+1 Credited)</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <span className="w-3 h-3 rounded-full bg-rose-600" />
@@ -866,6 +1054,128 @@ export default function EmployeeCalendarPage() {
             </div>
           </div>
         </div>
+
+        {/* COMP OFF CLAIM MODAL */}
+        {isCompOffModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in">
+            <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-md w-full overflow-hidden">
+              <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-linear-to-r from-rose-950 via-slate-900 to-rose-950 text-white">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 bg-rose-500/20 border border-rose-500/30 text-rose-200 rounded-xl">
+                    <Award className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-base text-white">Claim Compensatory Off</h3>
+                    <p className="text-xs text-rose-200">Weekend / Holiday Office Duty</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setIsCompOffModalOpen(false)}
+                  className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-white/10 transition cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleClaimCompOff} className="p-6 space-y-4">
+                <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-start gap-2.5">
+                  <Sparkles className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                  <span className="leading-relaxed">
+                    If you worked at the office on this off-day, submit your entry (login) and exit (logout) times. Once approved by Admin, <strong>+1 Complementary Leave</strong> will be added to your profile leave balance for year {selectedYear}.
+                  </span>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Off-Day Date <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={compOffForm.date}
+                    readOnly
+                    className="w-full text-xs font-bold bg-slate-100 border border-slate-200 rounded-xl px-3 py-2 text-slate-700 cursor-not-allowed"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Login (Entry Time) <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={compOffForm.entryTime}
+                      onChange={(e) => setCompOffForm((p) => ({ ...p, entryTime: e.target.value }))}
+                      placeholder="09:30 AM"
+                      required
+                      className="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2 text-slate-900 focus:ring-2 focus:ring-rose-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Logout (Exit Time) <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={compOffForm.exitTime}
+                      onChange={(e) => setCompOffForm((p) => ({ ...p, exitTime: e.target.value }))}
+                      placeholder="06:30 PM"
+                      required
+                      className="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2 text-slate-900 focus:ring-2 focus:ring-rose-500"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Hours Worked
+                  </label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    min="1"
+                    max="16"
+                    value={compOffForm.hoursWorked}
+                    onChange={(e) => setCompOffForm((p) => ({ ...p, hoursWorked: e.target.value }))}
+                    className="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2 text-slate-900 focus:ring-2 focus:ring-rose-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Work / Project Description <span className="text-rose-500">*</span>
+                  </label>
+                  <textarea
+                    rows="3"
+                    value={compOffForm.reason}
+                    onChange={(e) => setCompOffForm((p) => ({ ...p, reason: e.target.value }))}
+                    placeholder="e.g. Factory robotics cell calibration, urgency testing, on-site commissioning..."
+                    required
+                    className="w-full text-xs bg-white border border-slate-200 rounded-xl p-3 text-slate-900 focus:ring-2 focus:ring-rose-500"
+                  />
+                </div>
+
+                <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setIsCompOffModalOpen(false)}
+                    className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={submittingCompOff}
+                    className="px-5 py-2.5 bg-linear-to-r from-rose-800 to-rose-900 hover:from-rose-700 hover:to-rose-800 text-white font-bold text-xs rounded-xl shadow-xs transition disabled:opacity-60 cursor-pointer"
+                  >
+                    {submittingCompOff ? "Submitting..." : "Submit Claim for Sanction"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
       </div>
     </DashboardShell>
   );
