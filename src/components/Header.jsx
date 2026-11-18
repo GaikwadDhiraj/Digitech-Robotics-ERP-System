@@ -7,8 +7,7 @@ import ProfilePhotoModal from "@/components/ProfilePhotoModal";
 import { 
   SignInButton, 
   SignUpButton, 
-  SignedIn, 
-  SignedOut, 
+  Show, 
   UserButton 
 } from "@clerk/nextjs";
 import { 
@@ -143,17 +142,17 @@ export default function Header() {
 
           {/* Clerk Auth Integration */}
           <div className="pl-2 border-l border-slate-200">
-            <SignedIn>
-              <UserButton afterSignOutUrl="/" />
-            </SignedIn>
-            <SignedOut>
+            <Show when="signed-in">
+              <UserButton />
+            </Show>
+            <Show when="signed-out">
               <SignInButton mode="modal">
                 <button className="flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 transition cursor-pointer">
                   <LogIn className="w-3.5 h-3.5" />
                   Sign In
                 </button>
               </SignInButton>
-            </SignedOut>
+            </Show>
           </div>
         </div>
       </div>
