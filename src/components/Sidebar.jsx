@@ -79,7 +79,7 @@ export default function Sidebar() {
   const navItems = isAdmin ? adminNav : employeeNav;
 
   return (
-    <aside className="w-64 bg-slate-950 text-slate-300 flex flex-col shrink-0 sticky top-[61px] h-[calc(100vh-61px)] overflow-y-auto border-r border-slate-900 z-30">
+    <aside className="w-64 bg-slate-950 text-slate-300 flex flex-col shrink-0 h-full overflow-y-auto border-r border-slate-900 z-30">
       {/* Role Banner */}
       <div className="p-4 border-b border-slate-900">
         <div className={`p-3 rounded-2xl border flex items-center gap-3 ${

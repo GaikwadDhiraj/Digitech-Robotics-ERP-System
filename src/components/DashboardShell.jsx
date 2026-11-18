@@ -36,12 +36,14 @@ export default function DashboardShell({ children }) {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900 font-sans antialiased">
+    <div className="h-screen flex flex-col bg-slate-50 text-slate-900 font-sans antialiased overflow-hidden">
       <Header />
       <div className="flex-1 flex overflow-hidden">
         <Sidebar />
-        <main className="flex-1 overflow-y-auto p-6 lg:p-8 max-w-7xl mx-auto w-full">
-          {children}
+        <main className="flex-1 h-full overflow-y-auto p-6 lg:p-8">
+          <div className="max-w-7xl mx-auto w-full">
+            {children}
+          </div>
         </main>
       </div>
     </div>
