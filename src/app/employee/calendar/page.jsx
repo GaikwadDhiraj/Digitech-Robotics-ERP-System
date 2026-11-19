@@ -36,9 +36,55 @@ export default function EmployeeCalendarPage() {
   const [calendarSetting, setCalendarSetting] = useState({ weeklyOffDay: "SUNDAY" });
   const [loading, setLoading] = useState(true);
 
-  // Month & Year state (default November 2026 as per workspace date)
+  // Extract joining date information for the current employee
+  const joinDateStr = useMemo(() => {
+    if (!currentUser?.joinDate) return null;
+    try {
+      const d = new Date(currentUser.joinDate);
+      if (isNaN(d.getTime())) return null;
+      return d.toISOString().split("T")[0];
+    } catch (e) {
+      return null;
+    }
+  }, [currentUser?.joinDate]);
+
+  const joinYear = useMemo(() => {
+    if (!joinDateStr) return 2026;
+    return parseInt(joinDateStr.split("-")[0], 10);
+  }, [joinDateStr]);
+
+  const joinMonth = useMemo(() => {
+    if (!joinDateStr) return 0;
+    return parseInt(joinDateStr.split("-")[1], 10) - 1; // 0-indexed month
+  }, [joinDateStr]);
+
+  const formattedJoinDate = useMemo(() => {
+    if (!currentUser?.joinDate) return null;
+    try {
+      return new Date(currentUser.joinDate).toLocaleDateString("en-IN", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      });
+    } catch (e) {
+      return null;
+    }
+  }, [currentUser?.joinDate]);
+
+  // Month & Year state (default to joining month & year if joining is after Nov 2026, otherwise current month)
   const [selectedYear, setSelectedYear] = useState(2026);
   const [selectedMonth, setSelectedMonth] = useState(10); // 0-indexed: 10 = November
+
+  // Ensure calendar starts from employee's joining date
+  useEffect(() => {
+    if (joinDateStr) {
+      // If currently selected month/year is before joining date, advance to joining date
+      if (selectedYear < joinYear || (selectedYear === joinYear && selectedMonth < joinMonth)) {
+        setSelectedYear(joinYear);
+        setSelectedMonth(joinMonth);
+      }
+    }
+  }, [joinDateStr, joinYear, joinMonth]);
 
   // Hover state for Circular Analysis
   const [hoveredSegment, setHoveredSegment] = useState(null);
@@ -70,7 +116,28 @@ export default function EmployeeCalendarPage() {
     { value: 11, label: "December" },
   ];
 
-  const years = [2025, 2026, 2027];
+  // Dynamic years list starting from employee's joining year
+  const [currentSystemYear, setCurrentSystemYear] = useState(2026);
+  useEffect(() => {
+    setCurrentSystemYear(new Date().getFullYear());
+  }, []);
+
+  const maxYear = Math.max(currentSystemYear + 1, joinYear + 2);
+  const years = useMemo(() => {
+    const list = [];
+    for (let y = joinYear; y <= maxYear; y++) {
+      list.push(y);
+    }
+    return list;
+  }, [joinYear, maxYear]);
+
+  // Months available for the selected year (starts from joining month if in joining year)
+  const availableMonths = useMemo(() => {
+    if (selectedYear === joinYear) {
+      return months.filter((m) => m.value >= joinMonth);
+    }
+    return months;
+  }, [selectedYear, joinYear, joinMonth, months]);
 
   const loadData = async () => {
     if (!currentUser?.id) return;
@@ -108,13 +175,26 @@ export default function EmployeeCalendarPage() {
     loadData();
   }, [currentUser, selectedYear]);
 
-  // Navigate months
+  // Check if navigation to previous month is permitted based on joining date
+  const canGoPrev = useMemo(() => {
+    if (!joinDateStr) return true;
+    if (selectedYear < joinYear) return false;
+    if (selectedYear === joinYear && selectedMonth <= joinMonth) return false;
+    return true;
+  }, [selectedYear, selectedMonth, joinYear, joinMonth, joinDateStr]);
+
+  // Navigate months (strictly bounded by joining date)
   const prevMonth = () => {
+    if (!canGoPrev) return;
     if (selectedMonth === 0) {
-      setSelectedMonth(11);
-      setSelectedYear((y) => y - 1);
+      if (selectedYear - 1 >= joinYear) {
+        setSelectedMonth(11);
+        setSelectedYear((y) => y - 1);
+      }
     } else {
-      setSelectedMonth((m) => m - 1);
+      if (!(selectedYear === joinYear && selectedMonth - 1 < joinMonth)) {
+        setSelectedMonth((m) => m - 1);
+      }
     }
   };
 
@@ -128,8 +208,23 @@ export default function EmployeeCalendarPage() {
   };
 
   const currentMonth = () => {
-    setSelectedYear(2026);
-    setSelectedMonth(10);
+    const now = new Date();
+    const curY = now.getFullYear();
+    const curM = now.getMonth();
+    if (curY < joinYear || (curY === joinYear && curM < joinMonth)) {
+      setSelectedYear(joinYear);
+      setSelectedMonth(joinMonth);
+    } else {
+      setSelectedYear(curY);
+      setSelectedMonth(curM);
+    }
+  };
+
+  const handleYearChange = (newYear) => {
+    setSelectedYear(newYear);
+    if (newYear === joinYear && selectedMonth < joinMonth) {
+      setSelectedMonth(joinMonth);
+    }
   };
 
   const monthName = `${months[selectedMonth].label} ${selectedYear}`;
@@ -172,25 +267,33 @@ export default function EmployeeCalendarPage() {
 
       const dateString = `${selectedYear}-${String(selectedMonth + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 
+      // Check if day is prior to employee's joining date
+      const isPreJoining = joinDateStr ? dateString < joinDateStr : false;
+      const isJoiningDay = joinDateStr ? dateString === joinDateStr : false;
+
       // Check for holiday override
       const holiday = holidays.find((h) => h.date === dateString);
 
       // If an override marks this day as an explicit working day, it cancels out the weekend off
       const isWorkingDayOverride = holiday && holiday.isWorkingDay;
-      const isWeekend = isWeeklyOff && !isWorkingDayOverride;
+      const isWeekend = !isPreJoining && isWeeklyOff && !isWorkingDayOverride;
 
-      // Check for leave
-      const leave = leaves.find((l) => {
-        const start = l.startDate.split("T")[0];
-        const end = l.endDate.split("T")[0];
-        return dateString >= start && dateString <= end;
-      });
+      // Check for leave (only applicable on or after joining date)
+      const leave = !isPreJoining
+        ? leaves.find((l) => {
+            const start = l.startDate.split("T")[0];
+            const end = l.endDate.split("T")[0];
+            return dateString >= start && dateString <= end;
+          })
+        : null;
 
-      // Check for Comp Off claim on this day
-      const compOff = compOffs.find((c) => {
-        const cDate = (c.date || "").split("T")[0];
-        return cDate === dateString;
-      });
+      // Check for Comp Off claim on this day (only applicable on or after joining date)
+      const compOff = !isPreJoining
+        ? compOffs.find((c) => {
+            const cDate = (c.date || "").split("T")[0];
+            return cDate === dateString;
+          })
+        : null;
 
       days.push({
         dayNumber: day,
@@ -198,7 +301,9 @@ export default function EmployeeCalendarPage() {
         isCurrentMonth: true,
         isWeekend,
         isWorkingDayOverride,
-        holiday: isWorkingDayOverride ? null : holiday, // if it's an active work override, not treated as holiday off
+        isPreJoining,
+        isJoiningDay,
+        holiday: isWorkingDayOverride || isPreJoining ? null : holiday, // if work override or pre-joining, not an off-holiday
         holidayOverride: holiday,
         leave,
         compOff,
@@ -218,7 +323,7 @@ export default function EmployeeCalendarPage() {
     }
 
     return days;
-  }, [selectedYear, selectedMonth, holidays, leaves, compOffs, calendarSetting]);
+  }, [selectedYear, selectedMonth, holidays, leaves, compOffs, calendarSetting, joinDateStr]);
 
   const openCompOffModal = (dateStr) => {
     setCompOffForm({
@@ -270,10 +375,12 @@ export default function EmployeeCalendarPage() {
     }
   };
 
-  // Compute Circular Analysis Breakdown for the month
+  // Compute Circular Analysis Breakdown strictly from employee joining date
   const analysis = useMemo(() => {
     const currentMonthDays = calendarDays.filter((d) => d.isCurrentMonth);
-    const totalDays = currentMonthDays.length;
+    const activeServiceDays = currentMonthDays.filter((d) => !d.isPreJoining);
+    const preJoiningDays = currentMonthDays.filter((d) => d.isPreJoining).length;
+    const totalDays = activeServiceDays.length;
 
     let weekendCount = 0;
     let holidayCount = 0;
@@ -281,7 +388,7 @@ export default function EmployeeCalendarPage() {
     let leavePendingCount = 0;
     const typeWiseLeaves = {};
 
-    currentMonthDays.forEach((d) => {
+    activeServiceDays.forEach((d) => {
       if (d.holiday) {
         holidayCount++;
       } else if (d.isWeekend) {
@@ -304,6 +411,7 @@ export default function EmployeeCalendarPage() {
 
     return {
       totalDays,
+      preJoiningDays,
       weekendCount,
       holidayCount,
       totalWorkingDays,
@@ -400,8 +508,8 @@ export default function EmployeeCalendarPage() {
         )}
 
         {/* Section 1: Interactive Circular Attendance Analysis with Hover Effects & Attractive Colors */}
-        <div className="bg-white rounded-3xl border border-slate-200/90 p-6 shadow-xs">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 gap-3 mb-6">
+        <div className="bg-white rounded-3xl border border-slate-200/90 p-6 shadow-xs space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 gap-3">
             <div className="flex items-center gap-2.5">
               <div className="p-2.5 bg-rose-50 text-rose-800 border border-rose-200 rounded-xl">
                 <PieChart className="w-5 h-5" />
@@ -424,7 +532,21 @@ export default function EmployeeCalendarPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+          {analysis.preJoiningDays > 0 && formattedJoinDate && (
+            <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-amber-900 animate-in fade-in">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-amber-600 shrink-0" />
+                <span>
+                  Employee joined on <strong>{formattedJoinDate}</strong>. Calendar and working days are active from this date ({analysis.totalDays} active service days this month).
+                </span>
+              </div>
+              <span className="font-bold text-amber-950 bg-amber-100 px-2.5 py-0.5 rounded-lg text-[11px] self-start sm:self-auto shrink-0">
+                {analysis.preJoiningDays} Pre-joining days excluded
+              </span>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center pt-2">
             {/* Interactive SVG Circular Donut with Hover Effects */}
             <div className="lg:col-span-4 flex flex-col items-center justify-center p-6 bg-linear-to-b from-slate-50/80 to-white rounded-3xl border border-slate-200/80 relative">
               <div className="relative w-52 h-52 flex items-center justify-center">
@@ -810,12 +932,22 @@ export default function EmployeeCalendarPage() {
               </div>
               <div>
                 <h3 className="font-extrabold text-lg text-white">{monthName}</h3>
-                <p className="text-xs text-slate-300">Select any month to inspect attendance records</p>
+                <p className="text-xs text-slate-300">
+                  {formattedJoinDate ? `Attendance tracked from joining date: ${formattedJoinDate}` : "Select any month to inspect attendance records"}
+                </p>
               </div>
             </div>
 
             {/* Direct Month & Year Dropdowns */}
             <div className="flex flex-wrap items-center gap-2">
+              {/* Joining Date Badge */}
+              {formattedJoinDate && (
+                <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 border border-white/20 text-xs font-semibold text-rose-200 mr-1">
+                  <Sparkles className="w-3.5 h-3.5 text-rose-300" />
+                  <span>Joined: <strong className="text-white">{formattedJoinDate}</strong></span>
+                </div>
+              )}
+
               {/* Month Dropdown */}
               <div className="relative">
                 <select
@@ -823,7 +955,7 @@ export default function EmployeeCalendarPage() {
                   onChange={(e) => setSelectedMonth(parseInt(e.target.value, 10))}
                   className="bg-white/10 hover:bg-white/20 border border-white/20 text-white font-bold text-xs rounded-xl px-3 py-2 focus:ring-2 focus:ring-rose-500 focus:outline-hidden cursor-pointer"
                 >
-                  {months.map((m) => (
+                  {availableMonths.map((m) => (
                     <option key={m.value} value={m.value} className="text-slate-900 bg-white">
                       {m.label}
                     </option>
@@ -835,7 +967,7 @@ export default function EmployeeCalendarPage() {
               <div className="relative">
                 <select
                   value={selectedYear}
-                  onChange={(e) => setSelectedYear(parseInt(e.target.value, 10))}
+                  onChange={(e) => handleYearChange(parseInt(e.target.value, 10))}
                   className="bg-white/10 hover:bg-white/20 border border-white/20 text-white font-bold text-xs rounded-xl px-3 py-2 focus:ring-2 focus:ring-rose-500 focus:outline-hidden cursor-pointer"
                 >
                   {years.map((y) => (
@@ -858,8 +990,11 @@ export default function EmployeeCalendarPage() {
               <div className="flex items-center bg-white/10 border border-white/20 rounded-xl p-0.5">
                 <button
                   onClick={prevMonth}
-                  className="p-1.5 text-white hover:bg-white/20 rounded-lg transition cursor-pointer"
-                  title="Previous Month"
+                  disabled={!canGoPrev}
+                  className={`p-1.5 text-white rounded-lg transition ${
+                    !canGoPrev ? "opacity-30 cursor-not-allowed" : "hover:bg-white/20 cursor-pointer"
+                  }`}
+                  title={!canGoPrev ? "Cannot view months prior to employee joining date" : "Previous Month"}
                 >
                   <ChevronLeft className="w-4 h-4" />
                 </button>
@@ -891,6 +1026,7 @@ export default function EmployeeCalendarPage() {
               const isLeave = !!cell.leave;
               const isHoliday = !!cell.holiday;
               const isOff = cell.isWeekend;
+              const isPre = cell.isCurrentMonth && cell.isPreJoining;
 
               return (
                 <div
@@ -898,6 +1034,8 @@ export default function EmployeeCalendarPage() {
                   className={`min-h-[110px] p-2 flex flex-col justify-between transition ${
                     !cell.isCurrentMonth
                       ? "bg-slate-50/80 text-slate-300"
+                      : isPre
+                      ? "bg-slate-100/50 text-slate-400 border-dashed"
                       : isHoliday
                       ? "bg-rose-50/40"
                       : isLeave
@@ -913,6 +1051,8 @@ export default function EmployeeCalendarPage() {
                       className={`text-xs font-bold ${
                         !cell.isCurrentMonth
                           ? "text-slate-300"
+                          : isPre
+                          ? "text-slate-400"
                           : cell.isWeekend
                           ? "text-indigo-600 font-extrabold"
                           : "text-slate-800"
@@ -922,16 +1062,38 @@ export default function EmployeeCalendarPage() {
                     </span>
 
                     {/* Quick Badge */}
-                    {cell.isCurrentMonth && isOff && !isHoliday && (
+                    {cell.isCurrentMonth && isPre && (
+                      <span className="text-[8px] font-bold text-slate-400 bg-slate-200/70 px-1.5 py-0.2 rounded">
+                        Pre-Joining
+                      </span>
+                    )}
+
+                    {cell.isCurrentMonth && !isPre && isOff && !isHoliday && (
                       <span className="text-[9px] font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.2 rounded border border-indigo-100">
                         Off
                       </span>
                     )}
                   </div>
 
-                  {/* Cell Content: Holiday or Leave */}
+                  {/* Cell Content: Holiday or Leave or Pre-joining */}
                   <div className="mt-1 flex-1 flex flex-col justify-center">
-                    {cell.isCurrentMonth && isHoliday && (
+                    {/* Pre-Joining Inactive Indicator */}
+                    {isPre && (
+                      <div className="p-1.5 rounded-lg bg-slate-100/80 border border-slate-200/70 text-slate-400 text-[9px] font-semibold text-center space-y-0.5">
+                        <span className="block text-[8px] uppercase tracking-wider font-bold text-slate-400">Prior to Joining</span>
+                        <span className="block text-[9px] text-slate-400">Not Employed Yet</span>
+                      </div>
+                    )}
+
+                    {/* Celebration / Date of Joining Banner */}
+                    {cell.isCurrentMonth && cell.isJoiningDay && (
+                      <div className="mb-1 p-1 rounded-lg bg-rose-100 border border-rose-300 text-rose-900 text-[9px] font-black flex items-center justify-center gap-1 shadow-2xs">
+                        <Sparkles className="w-2.5 h-2.5 text-rose-600 shrink-0" />
+                        <span>Date of Joining</span>
+                      </div>
+                    )}
+
+                    {cell.isCurrentMonth && !isPre && isHoliday && (
                       <div className="p-1 rounded-lg bg-rose-100 border border-rose-200 text-rose-900 text-[10px] font-bold leading-tight">
                         <span className="flex items-center gap-1">
                           <Flag className="w-2.5 h-2.5 text-rose-600 shrink-0" />
@@ -940,7 +1102,7 @@ export default function EmployeeCalendarPage() {
                       </div>
                     )}
 
-                    {cell.isCurrentMonth && isLeave && (
+                    {cell.isCurrentMonth && !isPre && isLeave && (
                       <div
                         className={`p-1 rounded-lg border text-[10px] font-bold leading-tight ${
                           cell.leave.status === "APPROVED"
@@ -959,7 +1121,7 @@ export default function EmployeeCalendarPage() {
                     )}
 
                     {/* Present Working Day: Login & Logout Timings */}
-                    {cell.isCurrentMonth && !isHoliday && !isLeave && !isOff && (
+                    {cell.isCurrentMonth && !isPre && !isHoliday && !isLeave && !isOff && (
                       <div className="bg-emerald-50/90 border border-emerald-200/90 rounded-lg p-1.5 text-[10px] space-y-1 shadow-2xs">
                         <div className="flex items-center justify-between font-black text-emerald-900">
                           <span className="flex items-center gap-1">
@@ -984,7 +1146,7 @@ export default function EmployeeCalendarPage() {
                     )}
 
                     {/* Off-Day / Weekend / Holiday: Comp Off Claim or Approved Status */}
-                    {cell.isCurrentMonth && (isOff || isHoliday) && !isLeave && (
+                    {cell.isCurrentMonth && !isPre && (isOff || isHoliday) && !isLeave && (
                       <div className="mt-1 space-y-1">
                         {cell.compOff ? (
                           <div
@@ -999,7 +1161,7 @@ export default function EmployeeCalendarPage() {
                             <div className="flex items-center justify-between">
                               <span className="font-extrabold flex items-center gap-1 truncate">
                                 {cell.compOff.status === "APPROVED" ? (
-                                  <>
+                                   <>
                                     <Award className="w-2.5 h-2.5 text-emerald-600 shrink-0" />
                                     <span>Comp Off Credited</span>
                                   </>
@@ -1074,7 +1236,11 @@ export default function EmployeeCalendarPage() {
               </div>
               <div className="flex items-center gap-1.5">
                 <span className="w-3 h-3 rounded-full bg-indigo-500" />
-                <span>Weekly Off (Sat/Sun)</span>
+                <span>Weekly Off</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-3 h-3 rounded-full bg-slate-300 border border-slate-400" />
+                <span className="text-slate-500">Prior to Joining (Inactive)</span>
               </div>
             </div>
 
