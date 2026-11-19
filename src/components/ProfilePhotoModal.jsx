@@ -124,14 +124,14 @@ export default function ProfilePhotoModal({ isOpen, onClose }) {
             </div>
           )}
 
-          {/* Current Avatar Large Preview */}
+          {/* Current Avatar Large Circular Preview */}
           <div className="flex flex-col items-center justify-center">
             <div className="relative group">
-              <div className="w-32 h-32 rounded-3xl overflow-hidden ring-4 ring-rose-500/20 shadow-xl bg-slate-100 flex items-center justify-center">
+              <div className="w-36 h-36 rounded-full overflow-hidden ring-4 ring-rose-500/30 shadow-2xl bg-slate-100 flex items-center justify-center">
                 {previewUrl ? (
-                  <img src={previewUrl} alt="Avatar preview" className="w-full h-full object-cover" />
+                  <img src={previewUrl} alt="Avatar preview" className="w-full h-full object-cover rounded-full" />
                 ) : (
-                  <div className="w-full h-full flex flex-col items-center justify-center font-black text-3xl text-rose-900 bg-rose-50">
+                  <div className="w-full h-full rounded-full flex flex-col items-center justify-center font-black text-3xl text-rose-900 bg-rose-50">
                     <span>{currentUser?.name?.substring(0, 2).toUpperCase() || "EP"}</span>
                     <span className="text-[10px] text-rose-600 font-semibold mt-1">No Photo</span>
                   </div>
@@ -141,9 +141,9 @@ export default function ProfilePhotoModal({ isOpen, onClose }) {
               {/* Quick file trigger overlay icon */}
               <label
                 htmlFor="photoUploadInput"
-                className="absolute inset-0 rounded-3xl bg-slate-950/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white text-xs font-semibold cursor-pointer"
+                className="absolute inset-0 rounded-full bg-slate-950/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white text-xs font-semibold cursor-pointer"
               >
-                <Camera className="w-6 h-6" />
+                <Camera className="w-7 h-7" />
               </label>
             </div>
 

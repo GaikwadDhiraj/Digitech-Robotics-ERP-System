@@ -31,14 +31,30 @@ import {
   Award,
   LogIn,
   LogOut,
+  CalendarDays,
+  Sun,
+  Briefcase,
+  Flag,
+  PlusCircle,
+  RotateCcw,
+  CheckCheck,
 } from "lucide-react";
 
 export default function AdminLeaveSanctionsPage() {
   const { currentUser } = useAuth();
-  const [activeTab, setActiveTab] = useState("requests"); // "requests" | "compoff" | "policies"
+  const [activeTab, setActiveTab] = useState("requests"); // "requests" | "compoff" | "policies" | "calendar"
   const [leaves, setLeaves] = useState([]);
   const [policies, setPolicies] = useState([]);
   const [compOffs, setCompOffs] = useState([]);
+  const [holidays, setHolidays] = useState([]);
+  const [calendarSetting, setCalendarSetting] = useState({
+    weeklyOffDay: "SUNDAY",
+    defaultStartTime: "09:15 AM",
+    defaultEndTime: "06:30 PM",
+  });
+  const [calendarMonth, setCalendarMonth] = useState(10); // 10 = November 2026
+  const [calendarYear, setCalendarYear] = useState(2026);
+
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("PENDING");
   const [searchTerm, setSearchTerm] = useState("");
@@ -65,6 +81,17 @@ export default function AdminLeaveSanctionsPage() {
     color: "rose",
   });
   const [savingPolicy, setSavingPolicy] = useState(false);
+
+  // Calendar Holiday & Work Override Modal
+  const [isHolidayModalOpen, setIsHolidayModalOpen] = useState(false);
+  const [holidayForm, setHolidayForm] = useState({
+    name: "",
+    date: "",
+    type: "COMPANY",
+    isWorkingDay: false,
+  });
+  const [savingHoliday, setSavingHoliday] = useState(false);
+  const [savingSetting, setSavingSetting] = useState(false);
 
   const [notification, setNotification] = useState({ type: "", message: "" });
 
@@ -113,30 +140,148 @@ export default function AdminLeaveSanctionsPage() {
     }
   };
 
-  // Fetch leaves, policies & comp-offs
+  // Fetch leaves, policies, comp-offs, holidays & calendar settings
   const loadData = async () => {
     try {
       setLoading(true);
-      const [leavesRes, policiesRes, compOffsRes] = await Promise.all([
+      const [leavesRes, policiesRes, compOffsRes, holidaysRes, settingsRes] = await Promise.all([
         fetch("/api/leaves"),
         fetch("/api/leave-policies"),
         fetch("/api/comp-offs"),
+        fetch("/api/holidays"),
+        fetch("/api/calendar-settings"),
       ]);
 
-      const [leavesData, policiesData, compOffsData] = await Promise.all([
+      const [leavesData, policiesData, compOffsData, holidaysData, settingsData] = await Promise.all([
         leavesRes.json(),
         policiesRes.json(),
         compOffsRes.json(),
+        holidaysRes.json(),
+        settingsRes.json(),
       ]);
 
       if (leavesData.success) setLeaves(leavesData.data);
       if (policiesData.success) setPolicies(policiesData.data);
       if (compOffsData.success) setCompOffs(compOffsData.data);
+      if (holidaysData.success) setHolidays(holidaysData.data);
+      if (settingsData.success) setCalendarSetting(settingsData.data);
     } catch (err) {
       console.error(err);
     } finally {
       setLoading(false);
     }
+  };
+
+  // Calendar Management Handlers
+  const handleSaveCalendarSetting = async (newWeeklyOff) => {
+    setSavingSetting(true);
+    try {
+      const res = await fetch("/api/calendar-settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          weeklyOffDay: newWeeklyOff || calendarSetting.weeklyOffDay,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setCalendarSetting(data.data);
+        setNotification({
+          type: "success",
+          message: `Weekly Off setting updated to "${newWeeklyOff || calendarSetting.weeklyOffDay}". Employee monthly attendance roster synchronized!`,
+        });
+        loadData();
+      }
+    } catch (e) {
+      setNotification({ type: "error", message: "Failed to update calendar settings." });
+    } finally {
+      setSavingSetting(false);
+    }
+  };
+
+  const handleSaveHoliday = async (e) => {
+    e.preventDefault();
+    if (!holidayForm.name || !holidayForm.date) {
+      alert("Please provide Holiday Name and Date.");
+      return;
+    }
+    setSavingHoliday(true);
+    try {
+      const res = await fetch("/api/holidays", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(holidayForm),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setNotification({
+          type: "success",
+          message: holidayForm.isWorkingDay
+            ? `Special Working Day declared for ${holidayForm.date}!`
+            : `Holiday "${holidayForm.name}" added successfully!`,
+        });
+        setIsHolidayModalOpen(false);
+        setHolidayForm({ name: "", date: "", type: "COMPANY", isWorkingDay: false });
+        loadData();
+      } else {
+        alert(data.error || "Failed to add holiday.");
+      }
+    } catch (e) {
+      alert("Error saving holiday.");
+    } finally {
+      setSavingHoliday(false);
+    }
+  };
+
+  const handleDeleteHoliday = async (id, name) => {
+    if (!window.confirm(`Are you sure you want to remove "${name}" from the calendar?`)) return;
+    try {
+      const res = await fetch(`/api/holidays?id=${id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (data.success) {
+        setNotification({ type: "success", message: `Holiday "${name}" removed.` });
+        loadData();
+      }
+    } catch (e) {
+      setNotification({ type: "error", message: "Failed to delete holiday." });
+    }
+  };
+
+  const handleToggleWorkingDay = async (dateStr, isAlreadyWorkingDay) => {
+    try {
+      const res = await fetch("/api/holidays", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: isAlreadyWorkingDay ? "Weekend / Holiday Off" : "Special Working Day",
+          date: dateStr,
+          type: "SPECIAL_DAY",
+          isWorkingDay: !isAlreadyWorkingDay,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setNotification({
+          type: "success",
+          message: !isAlreadyWorkingDay
+            ? `Date ${dateStr} declared as an official WORKING DAY!`
+            : `Date ${dateStr} reset to non-working holiday!`,
+        });
+        loadData();
+      }
+    } catch (e) {
+      setNotification({ type: "error", message: "Failed to update day override." });
+    }
+  };
+
+  const openAddHolidayModal = (prefilledDate = "") => {
+    setHolidayForm({
+      name: "",
+      date: prefilledDate || `${calendarYear}-${String(calendarMonth + 1).padStart(2, "0")}-01`,
+      type: "COMPANY",
+      isWorkingDay: false,
+    });
+    setIsHolidayModalOpen(true);
   };
 
   useEffect(() => {
@@ -411,6 +556,18 @@ export default function AdminLeaveSanctionsPage() {
           >
             <Layers className="w-4 h-4" />
             <span>Annual Leave Policies (1 Jan - 31 Dec)</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("calendar")}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+              activeTab === "calendar"
+                ? "bg-rose-900 text-white shadow-xs"
+                : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+            }`}
+          >
+            <CalendarDays className="w-4 h-4" />
+            <span>Manage Monthly Calendar & Roster</span>
           </button>
         </div>
 
@@ -1017,6 +1174,351 @@ export default function AdminLeaveSanctionsPage() {
           </div>
         )}
 
+        {/* VIEW 4: MANAGE MONTHLY CALENDAR & WORK ROSTER */}
+        {activeTab === "calendar" && (
+          <div className="space-y-6 animate-in fade-in">
+            {/* CARD 1: Organization Weekly Off Rule Configuration */}
+            <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-xs space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-100 gap-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 bg-rose-50 text-rose-800 border border-rose-200 rounded-xl">
+                    <Sun className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-base text-slate-900">
+                      Organization Weekly Off Configuration
+                    </h3>
+                    <p className="text-xs text-slate-500">
+                      Configure standard non-working days. By default, all Sundays are holidays/off and remaining days are working days.
+                    </p>
+                  </div>
+                </div>
+
+                <span className="text-xs font-bold text-rose-900 bg-rose-50 border border-rose-200 px-3 py-1 rounded-full w-fit">
+                  Active Rule: {calendarSetting.weeklyOffDay === "SUNDAY" ? "All Sundays Off" : calendarSetting.weeklyOffDay === "SATURDAY_SUNDAY" ? "Saturday & Sunday Off" : "Sunday + Alt Saturdays"}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
+                {[
+                  {
+                    id: "SUNDAY",
+                    title: "Every Sunday (Default)",
+                    desc: "All Sundays are weekly off. Mon - Sat are scheduled working days (6-day workweek).",
+                  },
+                  {
+                    id: "SATURDAY_SUNDAY",
+                    title: "Saturday & Sunday",
+                    desc: "Both Saturday and Sunday are weekly off. Mon - Fri are working days (5-day workweek).",
+                  },
+                  {
+                    id: "SUNDAY_ALT_SATURDAY",
+                    title: "Every Sunday + Alternate Saturdays",
+                    desc: "All Sundays off plus 2nd & 4th Saturdays off. Remaining days are regular working days.",
+                  },
+                ].map((opt) => {
+                  const isSelected = calendarSetting.weeklyOffDay === opt.id;
+                  return (
+                    <div
+                      key={opt.id}
+                      onClick={() => handleSaveCalendarSetting(opt.id)}
+                      className={`p-4 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between space-y-3 ${
+                        isSelected
+                          ? "bg-rose-50/70 border-rose-400 ring-2 ring-rose-500/20 shadow-xs"
+                          : "bg-slate-50/60 border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+                      }`}
+                    >
+                      <div>
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-sm text-slate-900">{opt.title}</span>
+                          {isSelected ? (
+                            <span className="w-5 h-5 rounded-full bg-rose-700 text-white flex items-center justify-center text-xs font-black">
+                              ✓
+                            </span>
+                          ) : (
+                            <span className="w-4 h-4 rounded-full border border-slate-300" />
+                          )}
+                        </div>
+                        <p className="text-xs text-slate-500 mt-1 leading-relaxed">{opt.desc}</p>
+                      </div>
+
+                      <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between text-[11px]">
+                        <span className="font-bold text-slate-700">Click to apply</span>
+                        {isSelected && <span className="font-black text-rose-800">Currently Active</span>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* CARD 2: Interactive Monthly Calendar & Day-Wise Roster */}
+            <div className="bg-white rounded-3xl border border-slate-200 shadow-xs overflow-hidden">
+              {/* Header / Month Switcher */}
+              <div className="p-5 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-linear-to-r from-rose-950 via-slate-900 to-rose-950 text-white">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-rose-500/20 border border-rose-500/30 text-rose-200 rounded-xl">
+                    <CalendarDays className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-lg text-white">
+                      Roster Calendar: {["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"][calendarMonth]} {calendarYear}
+                    </h3>
+                    <p className="text-xs text-slate-300">
+                      Declare custom holidays or override any day as a working day. Syncs instantly with employees.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* Month Dropdown */}
+                  <select
+                    value={calendarMonth}
+                    onChange={(e) => setCalendarMonth(parseInt(e.target.value, 10))}
+                    className="bg-white/10 hover:bg-white/20 border border-white/20 text-white font-bold text-xs rounded-xl px-3 py-2 cursor-pointer focus:outline-hidden"
+                  >
+                    {[
+                      { v: 0, l: "January" }, { v: 1, l: "February" }, { v: 2, l: "March" },
+                      { v: 3, l: "April" }, { v: 4, l: "May" }, { v: 5, l: "June" },
+                      { v: 6, l: "July" }, { v: 7, l: "August" }, { v: 8, l: "September" },
+                      { v: 9, l: "October" }, { v: 10, l: "November" }, { v: 11, l: "December" },
+                    ].map((m) => (
+                      <option key={m.v} value={m.v} className="text-slate-900 bg-white">
+                        {m.l}
+                      </option>
+                    ))}
+                  </select>
+
+                  {/* Year Dropdown */}
+                  <select
+                    value={calendarYear}
+                    onChange={(e) => setCalendarYear(parseInt(e.target.value, 10))}
+                    className="bg-white/10 hover:bg-white/20 border border-white/20 text-white font-bold text-xs rounded-xl px-3 py-2 cursor-pointer focus:outline-hidden"
+                  >
+                    {[2025, 2026, 2027].map((y) => (
+                      <option key={y} value={y} className="text-slate-900 bg-white">
+                        {y}
+                      </option>
+                    ))}
+                  </select>
+
+                  {/* Add Holiday Button */}
+                  <button
+                    onClick={() => openAddHolidayModal()}
+                    className="px-3.5 py-2 bg-rose-800 hover:bg-rose-700 text-white text-xs font-bold rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Add Custom Holiday</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Day of Week Header */}
+              <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-100 text-center text-xs font-black text-slate-600 py-3">
+                <span className="text-rose-700">SUN (Weekly Off)</span>
+                <span>MON</span>
+                <span>TUE</span>
+                <span>WED</span>
+                <span>THU</span>
+                <span>FRI</span>
+                <span className="text-indigo-700">SAT</span>
+              </div>
+
+              {/* Calendar Grid of Month Days */}
+              <div className="grid grid-cols-7 divide-x divide-y divide-slate-100 bg-slate-50/30">
+                {(() => {
+                  const firstDayIndex = new Date(calendarYear, calendarMonth, 1).getDay();
+                  const daysInMonth = new Date(calendarYear, calendarMonth + 1, 0).getDate();
+                  const cells = [];
+
+                  // Prev month padding
+                  for (let i = 0; i < firstDayIndex; i++) {
+                    cells.push(
+                      <div key={`prev-${i}`} className="min-h-[110px] p-2 bg-slate-50/70 text-slate-300 flex flex-col justify-between">
+                        <span className="text-xs font-medium"></span>
+                      </div>
+                    );
+                  }
+
+                  // Month days
+                  for (let d = 1; d <= daysInMonth; d++) {
+                    const dateObj = new Date(calendarYear, calendarMonth, d);
+                    const dayOfWeek = dateObj.getDay();
+                    const dateString = `${calendarYear}-${String(calendarMonth + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+
+                    // Check default weekly off
+                    let isDefaultWeeklyOff = false;
+                    if (calendarSetting.weeklyOffDay === "SUNDAY") {
+                      isDefaultWeeklyOff = dayOfWeek === 0;
+                    } else if (calendarSetting.weeklyOffDay === "SATURDAY_SUNDAY") {
+                      isDefaultWeeklyOff = dayOfWeek === 0 || dayOfWeek === 6;
+                    } else if (calendarSetting.weeklyOffDay === "SUNDAY_ALT_SATURDAY") {
+                      const weekNum = Math.ceil(d / 7);
+                      isDefaultWeeklyOff = dayOfWeek === 0 || (dayOfWeek === 6 && (weekNum === 2 || weekNum === 4));
+                    }
+
+                    // Check holiday or override
+                    const holiday = holidays.find((h) => h.date === dateString);
+                    const isForcedWorkingDay = holiday && holiday.isWorkingDay === true;
+                    const isDeclaredHoliday = holiday && holiday.isWorkingDay === false;
+
+                    const isActualWorkingDay = isForcedWorkingDay || (!isDefaultWeeklyOff && !isDeclaredHoliday);
+
+                    cells.push(
+                      <div
+                        key={`day-${d}`}
+                        className={`min-h-[115px] p-2.5 flex flex-col justify-between transition ${
+                          isDeclaredHoliday
+                            ? "bg-rose-50/50 hover:bg-rose-50"
+                            : isForcedWorkingDay
+                            ? "bg-emerald-50/70 hover:bg-emerald-50"
+                            : isDefaultWeeklyOff
+                            ? "bg-slate-100/60 hover:bg-slate-100/90"
+                            : "bg-white hover:bg-slate-50/80"
+                        }`}
+                      >
+                        {/* Top: Day Number and Badge */}
+                        <div className="flex items-center justify-between">
+                          <span
+                            className={`text-xs font-black ${
+                              dayOfWeek === 0
+                                ? "text-rose-700"
+                                : dayOfWeek === 6
+                                ? "text-indigo-700"
+                                : "text-slate-800"
+                            }`}
+                          >
+                            {d}
+                          </span>
+
+                          <div>
+                            {isDeclaredHoliday && (
+                              <span className="text-[9px] font-black uppercase px-1.5 py-0.2 rounded bg-rose-200 text-rose-900 border border-rose-300">
+                                Holiday
+                              </span>
+                            )}
+                            {isForcedWorkingDay && (
+                              <span className="text-[9px] font-black uppercase px-1.5 py-0.2 rounded bg-emerald-200 text-emerald-950 border border-emerald-300">
+                                Working Day
+                              </span>
+                            )}
+                            {!holiday && isDefaultWeeklyOff && (
+                              <span className="text-[9px] font-black uppercase px-1.5 py-0.2 rounded bg-slate-200 text-slate-700">
+                                Off Day
+                              </span>
+                            )}
+                            {!holiday && !isDefaultWeeklyOff && (
+                              <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1 py-0.2 rounded border border-emerald-200">
+                                Working
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Middle: Name of Holiday if present */}
+                        <div className="mt-1 flex-1 flex flex-col justify-center">
+                          {holiday ? (
+                            <div
+                              className={`p-1.5 rounded-lg border text-[10px] font-bold leading-tight ${
+                                isForcedWorkingDay
+                                  ? "bg-emerald-100 border-emerald-300 text-emerald-950"
+                                  : "bg-rose-100 border-rose-300 text-rose-950"
+                              }`}
+                            >
+                              <div className="flex items-center gap-1 truncate">
+                                {isForcedWorkingDay ? (
+                                  <Briefcase className="w-3 h-3 text-emerald-700 shrink-0" />
+                                ) : (
+                                  <Flag className="w-3 h-3 text-rose-700 shrink-0" />
+                                )}
+                                <span className="truncate">{holiday.name}</span>
+                              </div>
+                              <div className="text-[9px] opacity-75 font-medium mt-0.5">
+                                {isForcedWorkingDay ? "Duty declared by Admin" : holiday.type}
+                              </div>
+                            </div>
+                          ) : isDefaultWeeklyOff ? (
+                            <div className="text-[10px] text-slate-500 font-medium italic text-center py-1">
+                              Weekly Off
+                            </div>
+                          ) : (
+                            <div className="text-[10px] text-emerald-800 font-medium text-center py-1">
+                              Standard Office
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Bottom: Quick Admin Controls */}
+                        <div className="mt-2 pt-1 border-t border-black/5 flex items-center justify-between gap-1">
+                          {isActualWorkingDay ? (
+                            <button
+                              type="button"
+                              onClick={() => openAddHolidayModal(dateString)}
+                              className="text-[9px] font-bold text-rose-800 hover:text-rose-950 hover:underline cursor-pointer"
+                              title="Declare this day as a holiday"
+                            >
+                              + Holiday
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handleToggleWorkingDay(dateString, false)}
+                              className="text-[9px] font-bold text-emerald-800 hover:text-emerald-950 hover:underline cursor-pointer"
+                              title="Declare this off-day as a mandatory working day"
+                            >
+                              Force Work
+                            </button>
+                          )}
+
+                          {holiday && (
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteHoliday(holiday.id, holiday.name)}
+                              className="text-[9px] text-slate-400 hover:text-rose-600 transition cursor-pointer"
+                              title="Delete holiday / reset to default"
+                            >
+                              Reset
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  return cells;
+                })()}
+              </div>
+
+              {/* Roster Legend */}
+              <div className="p-4 bg-white border-t border-slate-200 flex flex-wrap items-center justify-between text-xs text-slate-600 gap-4">
+                <div className="flex flex-wrap items-center gap-4">
+                  <span className="font-bold text-slate-900">Roster Legend:</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-3 h-3 rounded-full bg-emerald-500" />
+                    <span>Regular Office Working Day</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-3 h-3 rounded-full bg-rose-600" />
+                    <span>Official / National / Festival Holiday</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-3 h-3 rounded-full bg-slate-400" />
+                    <span>Weekly Off (Scheduled Non-Working)</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-3 h-3 rounded-full bg-emerald-600" />
+                    <span className="font-bold text-emerald-800">Special Working Day (Admin Override)</span>
+                  </div>
+                </div>
+
+                <div className="text-slate-400 text-xs">
+                  Active Year: {calendarYear}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* MODAL: Sanction Dialog */}
         {selectedLeave && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in">
@@ -1319,6 +1821,110 @@ export default function AdminLeaveSanctionsPage() {
                   </button>
                 </div>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* MODAL: Add Holiday / Working Day Override */}
+        {isHolidayModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in">
+            <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-md w-full overflow-hidden">
+              <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-linear-to-r from-rose-950 via-slate-900 to-rose-950 text-white">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-rose-500/20 border border-rose-500/30 text-rose-200 rounded-xl">
+                    <CalendarDays className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-base text-white">Calendar Override / Holiday</h3>
+                    <p className="text-xs text-rose-200">
+                      Configure official holiday or working day
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setIsHolidayModalOpen(false)}
+                  className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-white/10 transition cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveHoliday} className="p-6 space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                    Holiday / Event Title <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={holidayForm.name}
+                    onChange={(e) => setHolidayForm((f) => ({ ...f, name: e.target.value }))}
+                    placeholder="e.g. Independence Day, Annual Tech Day"
+                    className="w-full text-xs bg-white border border-slate-200 rounded-xl p-3 text-slate-900 focus:ring-2 focus:ring-rose-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                    Date <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={holidayForm.date}
+                    onChange={(e) => setHolidayForm((f) => ({ ...f, date: e.target.value }))}
+                    className="w-full text-xs bg-white border border-slate-200 rounded-xl p-3 text-slate-900 focus:ring-2 focus:ring-rose-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                    Holiday Category
+                  </label>
+                  <select
+                    value={holidayForm.type}
+                    onChange={(e) => setHolidayForm((f) => ({ ...f, type: e.target.value }))}
+                    className="w-full text-xs bg-white border border-slate-200 rounded-xl p-3 text-slate-900 focus:ring-2 focus:ring-rose-500"
+                  >
+                    <option value="NATIONAL">National Holiday (Mandatory Gazetted)</option>
+                    <option value="FESTIVAL">Festival Holiday</option>
+                    <option value="COMPANY">Company Holiday / Foundation Day</option>
+                    <option value="SPECIAL_DAY">Special Day</option>
+                  </select>
+                </div>
+
+                <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl">
+                  <label className="flex items-center gap-2.5 cursor-pointer text-xs font-bold text-slate-800">
+                    <input
+                      type="checkbox"
+                      checked={holidayForm.isWorkingDay}
+                      onChange={(e) => setHolidayForm((f) => ({ ...f, isWorkingDay: e.target.checked }))}
+                      className="w-4 h-4 rounded border-slate-300 text-rose-800 focus:ring-rose-500"
+                    />
+                    <span>Declare as Special Working Day (Duty Day)</span>
+                  </label>
+                  <p className="text-[11px] text-slate-500 mt-1 pl-6.5">
+                    Check this if you want to turn a weekend off or festival day into an active duty day with standard punch-in expectations.
+                  </p>
+                </div>
+
+                <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setIsHolidayModalOpen(false)}
+                    className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={savingHoliday}
+                    className="px-5 py-2.5 bg-linear-to-r from-rose-800 to-rose-900 hover:from-rose-700 hover:to-rose-800 text-white font-bold text-xs rounded-xl shadow-xs transition disabled:opacity-60 cursor-pointer"
+                  >
+                    {savingHoliday ? "Saving..." : "Save Calendar Event"}
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         )}

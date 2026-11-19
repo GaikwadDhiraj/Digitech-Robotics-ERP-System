@@ -62,7 +62,7 @@ const defaultDepartments = [
 const initialEmployees = [
   {
     id: "admin-1",
-    employeeId: "Digitech-Adm-001",
+    employeeId: "DG-26-0001",
     name: "Dhiraj Gaikwad",
     email: "dvgaikwad333@gmail.com",
     personalEmail: "dvgaikwad333@gmail.com",
@@ -72,9 +72,19 @@ const initialEmployees = [
     role: "ADMIN",
     status: "ACTIVE",
     salary: 1500000,
-    joinDate: new Date("2023-01-01").toISOString(),
+    joinDate: new Date("2026-01-01").toISOString(),
     bio: "Digitech Robotics Administrator",
     avatarUrl: "",
+    bankDetailsLocked: true,
+    bankEditRequested: false,
+    resumeUrl: null,
+    resumeName: null,
+    aadharDocUrl: null,
+    aadharDocName: null,
+    panDocUrl: null,
+    panDocName: null,
+    bankDocUrl: null,
+    bankDocName: null,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   },
@@ -125,6 +135,14 @@ if (!globalMemory.__ERP_DEPARTMENTS__) {
 }
 if (!globalMemory.__ERP_COMP_OFFS__) {
   globalMemory.__ERP_COMP_OFFS__ = [];
+}
+if (!globalMemory.__ERP_CALENDAR_SETTING__) {
+  globalMemory.__ERP_CALENDAR_SETTING__ = {
+    id: "default-org-calendar",
+    weeklyOffDay: "SUNDAY",
+    defaultStartTime: "09:15 AM",
+    defaultEndTime: "06:30 PM",
+  };
 }
 
 // Helper to check if Prisma has a working database connection
@@ -183,19 +201,20 @@ export const dataStore = {
 
   async createEmployee(data) {
     let generatedId = data.employeeId;
-    if (!generatedId) {
+    if (!generatedId || generatedId.startsWith("Digitech-") || generatedId.startsWith("EMP-")) {
+      const joinYear = data.joinDate ? new Date(data.joinDate).getFullYear().toString().slice(-2) : "26";
+      let count = 1;
       if (await isPrismaAvailable()) {
         try {
-          const empCount = await prisma.user.count({ where: { role: "EMPLOYEE" } });
-          generatedId = `Digitech-Emp-${String(empCount + 1).padStart(3, "0")}`;
+          const empCount = await prisma.user.count();
+          count = empCount + 1;
         } catch (e) {
-          const empCount = globalMemory.__ERP_EMPLOYEES__.filter((e) => e.role === "EMPLOYEE").length;
-          generatedId = `Digitech-Emp-${String(empCount + 1).padStart(3, "0")}`;
+          count = globalMemory.__ERP_EMPLOYEES__.length + 1;
         }
       } else {
-        const empCount = globalMemory.__ERP_EMPLOYEES__.filter((e) => e.role === "EMPLOYEE").length;
-        generatedId = `Digitech-Emp-${String(empCount + 1).padStart(3, "0")}`;
+        count = globalMemory.__ERP_EMPLOYEES__.length + 1;
       }
+      generatedId = `DG-${joinYear}-${String(count).padStart(4, "0")}`;
     }
 
     const newEmp = {
@@ -223,6 +242,16 @@ export const dataStore = {
       bankAccountNumber: data.bankAccountNumber || "",
       bankIfscCode: data.bankIfscCode || "",
       bankName: data.bankName || "",
+      bankDetailsLocked: data.bankDetailsLocked || false,
+      bankEditRequested: data.bankEditRequested || false,
+      resumeUrl: data.resumeUrl || null,
+      resumeName: data.resumeName || null,
+      aadharDocUrl: data.aadharDocUrl || null,
+      aadharDocName: data.aadharDocName || null,
+      panDocUrl: data.panDocUrl || null,
+      panDocName: data.panDocName || null,
+      bankDocUrl: data.bankDocUrl || null,
+      bankDocName: data.bankDocName || null,
       emergencyContact: data.emergencyContact || "",
       avatarUrl: data.avatarUrl || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80",
       bio: data.bio || "",
@@ -265,16 +294,41 @@ export const dataStore = {
     return newEmp;
   },
 
-  async updateEmployee(id, data) {
+  async updateEmployee(id, data, options = {}) {
+    let updatePayload = { ...data };
+
+    // Employee self-service restrictions
+    if (options.isEmployeeSelfEdit) {
+      delete updatePayload.name;
+      delete updatePayload.email;
+      delete updatePayload.salary;
+      delete updatePayload.role;
+      delete updatePayload.department;
+      delete updatePayload.designation;
+
+      const existing = await this.getEmployeeById(id);
+      if (existing?.bankDetailsLocked) {
+        delete updatePayload.bankAccountName;
+        delete updatePayload.bankAccountNumber;
+        delete updatePayload.bankIfscCode;
+        delete updatePayload.bankName;
+        delete updatePayload.bankDocUrl;
+        delete updatePayload.bankDocName;
+      } else if (updatePayload.bankAccountNumber && updatePayload.bankAccountNumber.trim().length > 0) {
+        // First-time submission of bank details locks it automatically
+        updatePayload.bankDetailsLocked = true;
+      }
+    }
+
     if (await isPrismaAvailable()) {
       try {
         return await prisma.user.update({
           where: { id },
           data: {
-            ...data,
-            salary: data.salary !== undefined ? parseFloat(data.salary) : undefined,
-            joinDate: data.joinDate ? new Date(data.joinDate) : undefined,
-            dob: data.dob ? new Date(data.dob) : undefined,
+            ...updatePayload,
+            salary: updatePayload.salary !== undefined ? parseFloat(updatePayload.salary) : undefined,
+            joinDate: updatePayload.joinDate ? new Date(updatePayload.joinDate) : undefined,
+            dob: updatePayload.dob ? new Date(updatePayload.dob) : undefined,
           },
         });
       } catch (err) {
@@ -286,8 +340,8 @@ export const dataStore = {
     if (index === -1) return null;
     globalMemory.__ERP_EMPLOYEES__[index] = {
       ...globalMemory.__ERP_EMPLOYEES__[index],
-      ...data,
-      salary: data.salary !== undefined ? parseFloat(data.salary) : globalMemory.__ERP_EMPLOYEES__[index].salary,
+      ...updatePayload,
+      salary: updatePayload.salary !== undefined ? parseFloat(updatePayload.salary) : globalMemory.__ERP_EMPLOYEES__[index].salary,
       updatedAt: new Date().toISOString(),
     };
     return globalMemory.__ERP_EMPLOYEES__[index];
@@ -536,9 +590,151 @@ export const dataStore = {
     return { ...globalMemory.__ERP_LEAVES__[index], user };
   },
 
-  // HOLIDAYS
+  // HOLIDAYS & WORK ROSTER METHODS
   async getHolidays() {
+    if (await isPrismaAvailable()) {
+      try {
+        const count = await prisma.holiday.count();
+        if (count === 0) {
+          // Seed fixed holidays
+          for (const h of fixedHolidays) {
+            await prisma.holiday.create({
+              data: {
+                name: h.name,
+                date: new Date(h.date),
+                type: h.type,
+                isWorkingDay: false,
+              },
+            });
+          }
+        }
+        const dbHolidays = await prisma.holiday.findMany({
+          orderBy: { date: "asc" },
+        });
+        return dbHolidays.map((h) => ({
+          ...h,
+          date: h.date.toISOString().split("T")[0],
+        }));
+      } catch (err) {
+        console.warn("Prisma holidays fallback:", err.message);
+      }
+    }
     return globalMemory.__ERP_HOLIDAYS__;
+  },
+
+  async createHoliday(data) {
+    const dateStr = (data.date || "").split("T")[0];
+    const newH = {
+      id: "h-" + Date.now(),
+      name: data.name,
+      date: dateStr,
+      type: data.type || "COMPANY",
+      isWorkingDay: data.isWorkingDay === true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    if (await isPrismaAvailable()) {
+      try {
+        const created = await prisma.holiday.create({
+          data: {
+            name: newH.name,
+            date: new Date(newH.date),
+            type: newH.type,
+            isWorkingDay: newH.isWorkingDay,
+          },
+        });
+        return {
+          ...created,
+          date: created.date.toISOString().split("T")[0],
+        };
+      } catch (err) {
+        console.warn("Prisma create holiday fallback:", err.message);
+      }
+    }
+
+    const idx = globalMemory.__ERP_HOLIDAYS__.findIndex((h) => h.date === dateStr);
+    if (idx !== -1) {
+      globalMemory.__ERP_HOLIDAYS__[idx] = newH;
+    } else {
+      globalMemory.__ERP_HOLIDAYS__.push(newH);
+    }
+    return newH;
+  },
+
+  async deleteHoliday(id) {
+    if (await isPrismaAvailable()) {
+      try {
+        await prisma.holiday.delete({ where: { id } });
+        return true;
+      } catch (err) {
+        console.warn("Prisma delete holiday fallback:", err.message);
+      }
+    }
+    const idx = globalMemory.__ERP_HOLIDAYS__.findIndex((h) => h.id === id);
+    if (idx !== -1) {
+      globalMemory.__ERP_HOLIDAYS__.splice(idx, 1);
+      return true;
+    }
+    return false;
+  },
+
+  // CALENDAR SETTINGS (WEEKLY OFF & TIMINGS)
+  async getCalendarSetting() {
+    if (await isPrismaAvailable()) {
+      try {
+        let setting = await prisma.calendarSetting.findFirst();
+        if (!setting) {
+          setting = await prisma.calendarSetting.create({
+            data: {
+              id: "default-org-calendar",
+              weeklyOffDay: "SUNDAY",
+              defaultStartTime: "09:15 AM",
+              defaultEndTime: "06:30 PM",
+            },
+          });
+        }
+        return setting;
+      } catch (err) {
+        console.warn("Prisma calendar setting fallback:", err.message);
+      }
+    }
+    return (
+      globalMemory.__ERP_CALENDAR_SETTING__ || {
+        id: "default-org-calendar",
+        weeklyOffDay: "SUNDAY",
+        defaultStartTime: "09:15 AM",
+        defaultEndTime: "06:30 PM",
+      }
+    );
+  },
+
+  async updateCalendarSetting(data) {
+    if (await isPrismaAvailable()) {
+      try {
+        return await prisma.calendarSetting.upsert({
+          where: { id: "default-org-calendar" },
+          update: {
+            weeklyOffDay: data.weeklyOffDay || "SUNDAY",
+            defaultStartTime: data.defaultStartTime || "09:15 AM",
+            defaultEndTime: data.defaultEndTime || "06:30 PM",
+          },
+          create: {
+            id: "default-org-calendar",
+            weeklyOffDay: data.weeklyOffDay || "SUNDAY",
+            defaultStartTime: data.defaultStartTime || "09:15 AM",
+            defaultEndTime: data.defaultEndTime || "06:30 PM",
+          },
+        });
+      } catch (err) {
+        console.warn("Prisma calendar update fallback:", err.message);
+      }
+    }
+    globalMemory.__ERP_CALENDAR_SETTING__ = {
+      ...(globalMemory.__ERP_CALENDAR_SETTING__ || {}),
+      ...data,
+    };
+    return globalMemory.__ERP_CALENDAR_SETTING__;
   },
 
   // DEPARTMENT METHODS

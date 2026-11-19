@@ -33,6 +33,7 @@ export default function EmployeeCalendarPage() {
   const [balances, setBalances] = useState([]);
   const [holidays, setHolidays] = useState([]);
   const [compOffs, setCompOffs] = useState([]);
+  const [calendarSetting, setCalendarSetting] = useState({ weeklyOffDay: "SUNDAY" });
   const [loading, setLoading] = useState(true);
 
   // Month & Year state (default November 2026 as per workspace date)
@@ -75,24 +76,27 @@ export default function EmployeeCalendarPage() {
     if (!currentUser?.id) return;
     try {
       setLoading(true);
-      const [leavesRes, balancesRes, holidaysRes, compOffsRes] = await Promise.all([
+      const [leavesRes, balancesRes, holidaysRes, compOffsRes, settingsRes] = await Promise.all([
         fetch(`/api/leaves?userId=${currentUser.id}`),
         fetch(`/api/leave-balances?userId=${currentUser.id}&year=${selectedYear}`),
         fetch("/api/holidays"),
         fetch(`/api/comp-offs?userId=${currentUser.id}`),
+        fetch("/api/calendar-settings"),
       ]);
 
-      const [leavesData, balancesData, holidaysData, compOffsData] = await Promise.all([
+      const [leavesData, balancesData, holidaysData, compOffsData, settingsData] = await Promise.all([
         leavesRes.json(),
         balancesRes.json(),
         holidaysRes.json(),
         compOffsRes.json(),
+        settingsRes.json(),
       ]);
 
       if (leavesData.success) setLeaves(leavesData.data);
       if (balancesData.success) setBalances(balancesData.data);
       if (holidaysData.success) setHolidays(holidaysData.data);
       if (compOffsData.success) setCompOffs(compOffsData.data);
+      if (settingsData.success && settingsData.data) setCalendarSetting(settingsData.data);
     } catch (err) {
       console.error(err);
     } finally {
@@ -151,12 +155,29 @@ export default function EmployeeCalendarPage() {
     // Current month days
     for (let day = 1; day <= daysInMonth; day++) {
       const dateObj = new Date(selectedYear, selectedMonth, day);
-      const dayOfWeek = dateObj.getDay();
-      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6; // Sunday or Saturday
+      const dayOfWeek = dateObj.getDay(); // 0 is Sunday, 6 is Saturday
+      
+      // Determine weekly off according to Admin Calendar Setting
+      let isWeeklyOff = false;
+      const offRule = calendarSetting?.weeklyOffDay || "SUNDAY";
+      if (offRule === "SATURDAY_SUNDAY") {
+        isWeeklyOff = dayOfWeek === 0 || dayOfWeek === 6;
+      } else if (offRule === "SUNDAY_ALT_SATURDAY") {
+        const satOccurrence = Math.ceil(day / 7);
+        isWeeklyOff = dayOfWeek === 0 || (dayOfWeek === 6 && (satOccurrence === 2 || satOccurrence === 4));
+      } else {
+        // Default "SUNDAY": Only Sunday is weekly off
+        isWeeklyOff = dayOfWeek === 0;
+      }
+
       const dateString = `${selectedYear}-${String(selectedMonth + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 
-      // Check for holiday
+      // Check for holiday override
       const holiday = holidays.find((h) => h.date === dateString);
+
+      // If an override marks this day as an explicit working day, it cancels out the weekend off
+      const isWorkingDayOverride = holiday && holiday.isWorkingDay;
+      const isWeekend = isWeeklyOff && !isWorkingDayOverride;
 
       // Check for leave
       const leave = leaves.find((l) => {
@@ -176,7 +197,9 @@ export default function EmployeeCalendarPage() {
         dateString,
         isCurrentMonth: true,
         isWeekend,
-        holiday,
+        isWorkingDayOverride,
+        holiday: isWorkingDayOverride ? null : holiday, // if it's an active work override, not treated as holiday off
+        holidayOverride: holiday,
         leave,
         compOff,
       });
@@ -195,7 +218,7 @@ export default function EmployeeCalendarPage() {
     }
 
     return days;
-  }, [selectedYear, selectedMonth, holidays, leaves, compOffs]);
+  }, [selectedYear, selectedMonth, holidays, leaves, compOffs, calendarSetting]);
 
   const openCompOffModal = (dateStr) => {
     setCompOffForm({
@@ -546,7 +569,13 @@ export default function EmployeeCalendarPage() {
                     <>
                       <span className="text-3xl font-black text-indigo-600">{analysis.weekendCount}</span>
                       <span className="text-[10px] font-black uppercase text-indigo-800 tracking-wider">Weekly Offs</span>
-                      <span className="text-[10px] text-indigo-600 font-bold">Sat & Sun</span>
+                      <span className="text-[10px] text-indigo-600 font-bold">
+                        {calendarSetting?.weeklyOffDay === "SATURDAY_SUNDAY"
+                          ? "Sat & Sun"
+                          : calendarSetting?.weeklyOffDay === "SUNDAY_ALT_SATURDAY"
+                          ? "Sun + Alt Sat"
+                          : "Every Sunday"}
+                      </span>
                     </>
                   )}
                   {!hoveredSegment && (

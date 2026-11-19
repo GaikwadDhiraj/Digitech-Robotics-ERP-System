@@ -52,6 +52,16 @@ model User {
   bankAccountNumber     String?         // Bank A/C Number
   bankIfscCode          String?         // IFSC Code
   bankName              String?         // Bank Name
+  bankDetailsLocked     Boolean         @default(false) // One-time editable by employee, then locked
+  bankEditRequested     Boolean         @default(false) // Employee requested admin to unlock
+  resumeUrl             String?         // Uploaded Resume Document
+  resumeName            String?
+  aadharDocUrl          String?         // Uploaded Aadhaar Card
+  aadharDocName         String?
+  panDocUrl             String?         // Uploaded PAN Card
+  panDocName            String?
+  bankDocUrl            String?         // Uploaded Bank Passbook / Cheque
+  bankDocName           String?
   emergencyContact      String?
   avatarUrl             String?
   bio                   String?
@@ -112,12 +122,21 @@ model LeaveRequest {
 }
 
 model Holiday {
-  id        String   @id @default(cuid())
-  name      String
-  date      DateTime
-  type      String   @default("NATIONAL") // NATIONAL, FESTIVAL, COMPANY
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String   @id @default(cuid())
+  name         String
+  date         DateTime
+  type         String   @default("NATIONAL") // NATIONAL, FESTIVAL, COMPANY, SPECIAL_DAY
+  isWorkingDay Boolean  @default(false) // If true, Admin declared this off-day/weekend as an official working day
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model CalendarSetting {
+  id               String   @id @default("default-org-calendar")
+  weeklyOffDay     String   @default("SUNDAY") // "SUNDAY", "SATURDAY_SUNDAY", "SATURDAY", etc.
+  defaultStartTime String   @default("09:15 AM")
+  defaultEndTime   String   @default("06:30 PM")
+  updatedAt        DateTime @updatedAt
 }
 
 model Department {

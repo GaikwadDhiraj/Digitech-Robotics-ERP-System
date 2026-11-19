@@ -18,7 +18,8 @@ export async function PUT(request, { params }) {
   try {
     const { id } = await params;
     const body = await request.json();
-    const updated = await dataStore.updateEmployee(id, body);
+    const isEmployeeSelfEdit = body.isEmployeeSelfEdit === true;
+    const updated = await dataStore.updateEmployee(id, body, { isEmployeeSelfEdit });
     if (!updated) {
       return NextResponse.json({ success: false, error: "Employee not found" }, { status: 404 });
     }
