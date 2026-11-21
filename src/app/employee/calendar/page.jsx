@@ -116,28 +116,49 @@ export default function EmployeeCalendarPage() {
     { value: 11, label: "December" },
   ];
 
-  // Dynamic years list starting from employee's joining year
-  const [currentSystemYear, setCurrentSystemYear] = useState(2026);
+  // Current real-world reference date (initialized with stable default, hydrated in useEffect)
+  const [systemToday, setSystemToday] = useState({
+    year: 2026,
+    month: 10, // November
+    day: 21,
+    dateString: "2026-11-21",
+  });
+
   useEffect(() => {
-    setCurrentSystemYear(new Date().getFullYear());
+    const now = new Date();
+    const curY = now.getFullYear();
+    const curM = now.getMonth();
+    const curD = now.getDate();
+    const ds = `${curY}-${String(curM + 1).padStart(2, "0")}-${String(curD).padStart(2, "0")}`;
+    setSystemToday({ year: curY, month: curM, day: curD, dateString: ds });
+
+    // Guard: Prevent user from viewing future months beyond current month
+    if (selectedYear > curY || (selectedYear === curY && selectedMonth > curM)) {
+      setSelectedYear(curY);
+      setSelectedMonth(curM);
+    }
   }, []);
 
-  const maxYear = Math.max(currentSystemYear + 1, joinYear + 2);
+  // Dynamic years list: starts from employee's joining year and capped at current year (NO FUTURE YEARS)
   const years = useMemo(() => {
     const list = [];
-    for (let y = joinYear; y <= maxYear; y++) {
+    const endYear = Math.max(joinYear, systemToday.year);
+    for (let y = joinYear; y <= endYear; y++) {
       list.push(y);
     }
     return list;
-  }, [joinYear, maxYear]);
+  }, [joinYear, systemToday.year]);
 
-  // Months available for the selected year (starts from joining month if in joining year)
+  // Months available for selected year:
+  // - Cannot precede employee's joining month in join year
+  // - Cannot exceed current month in current year (NO FUTURE MONTHS)
   const availableMonths = useMemo(() => {
-    if (selectedYear === joinYear) {
-      return months.filter((m) => m.value >= joinMonth);
-    }
-    return months;
-  }, [selectedYear, joinYear, joinMonth, months]);
+    return months.filter((m) => {
+      if (selectedYear === joinYear && m.value < joinMonth) return false;
+      if (selectedYear === systemToday.year && m.value > systemToday.month) return false;
+      return true;
+    });
+  }, [selectedYear, joinYear, joinMonth, systemToday.year, systemToday.month, months]);
 
   const loadData = async () => {
     if (!currentUser?.id) return;
@@ -183,7 +204,14 @@ export default function EmployeeCalendarPage() {
     return true;
   }, [selectedYear, selectedMonth, joinYear, joinMonth, joinDateStr]);
 
-  // Navigate months (strictly bounded by joining date)
+  // Check if navigation to next month is permitted (strictly capped at current month - NO FUTURE MONTHS)
+  const canGoNext = useMemo(() => {
+    if (selectedYear > systemToday.year) return false;
+    if (selectedYear === systemToday.year && selectedMonth >= systemToday.month) return false;
+    return true;
+  }, [selectedYear, selectedMonth, systemToday.year, systemToday.month]);
+
+  // Navigate months (strictly bounded: joining date on the left, current month on the right)
   const prevMonth = () => {
     if (!canGoPrev) return;
     if (selectedMonth === 0) {
@@ -199,31 +227,31 @@ export default function EmployeeCalendarPage() {
   };
 
   const nextMonth = () => {
+    if (!canGoNext) return;
     if (selectedMonth === 11) {
-      setSelectedMonth(0);
-      setSelectedYear((y) => y + 1);
+      if (selectedYear + 1 <= systemToday.year) {
+        setSelectedMonth(0);
+        setSelectedYear((y) => y + 1);
+      }
     } else {
-      setSelectedMonth((m) => m + 1);
+      if (!(selectedYear === systemToday.year && selectedMonth + 1 > systemToday.month)) {
+        setSelectedMonth((m) => m + 1);
+      }
     }
   };
 
   const currentMonth = () => {
-    const now = new Date();
-    const curY = now.getFullYear();
-    const curM = now.getMonth();
-    if (curY < joinYear || (curY === joinYear && curM < joinMonth)) {
-      setSelectedYear(joinYear);
-      setSelectedMonth(joinMonth);
-    } else {
-      setSelectedYear(curY);
-      setSelectedMonth(curM);
-    }
+    setSelectedYear(systemToday.year);
+    setSelectedMonth(systemToday.month);
   };
 
   const handleYearChange = (newYear) => {
     setSelectedYear(newYear);
     if (newYear === joinYear && selectedMonth < joinMonth) {
       setSelectedMonth(joinMonth);
+    }
+    if (newYear === systemToday.year && selectedMonth > systemToday.month) {
+      setSelectedMonth(systemToday.month);
     }
   };
 
@@ -271,6 +299,11 @@ export default function EmployeeCalendarPage() {
       const isPreJoining = joinDateStr ? dateString < joinDateStr : false;
       const isJoiningDay = joinDateStr ? dateString === joinDateStr : false;
 
+      // Temporal checks relative to current real-world date
+      const isToday = dateString === systemToday.dateString;
+      const isFuture = dateString > systemToday.dateString;
+      const isPast = dateString < systemToday.dateString;
+
       // Check for holiday override
       const holiday = holidays.find((h) => h.date === dateString);
 
@@ -287,7 +320,7 @@ export default function EmployeeCalendarPage() {
           })
         : null;
 
-      // Check for Comp Off claim on this day (only applicable on or after joining date)
+      // Check for Comp Off claim on this day (only applicable on or after joining date and for days already passed or today)
       const compOff = !isPreJoining
         ? compOffs.find((c) => {
             const cDate = (c.date || "").split("T")[0];
@@ -303,6 +336,9 @@ export default function EmployeeCalendarPage() {
         isWorkingDayOverride,
         isPreJoining,
         isJoiningDay,
+        isToday,
+        isFuture,
+        isPast,
         holiday: isWorkingDayOverride || isPreJoining ? null : holiday, // if work override or pre-joining, not an off-holiday
         holidayOverride: holiday,
         leave,
@@ -319,11 +355,14 @@ export default function EmployeeCalendarPage() {
         dateString: new Date(selectedYear, selectedMonth + 1, i).toISOString().split("T")[0],
         isCurrentMonth: false,
         isWeekend: false,
+        isToday: false,
+        isFuture: true,
+        isPast: false,
       });
     }
 
     return days;
-  }, [selectedYear, selectedMonth, holidays, leaves, compOffs, calendarSetting, joinDateStr]);
+  }, [selectedYear, selectedMonth, holidays, leaves, compOffs, calendarSetting, joinDateStr, systemToday]);
 
   const openCompOffModal = (dateStr) => {
     setCompOffForm({
@@ -375,17 +414,23 @@ export default function EmployeeCalendarPage() {
     }
   };
 
-  // Compute Circular Analysis Breakdown strictly from employee joining date
+  // Compute Circular Analysis Breakdown strictly from employee joining date and up to current date
   const analysis = useMemo(() => {
     const currentMonthDays = calendarDays.filter((d) => d.isCurrentMonth);
     const activeServiceDays = currentMonthDays.filter((d) => !d.isPreJoining);
     const preJoiningDays = currentMonthDays.filter((d) => d.isPreJoining).length;
     const totalDays = activeServiceDays.length;
 
+    const isCurrentMonthSelected =
+      selectedYear === systemToday.year && selectedMonth === systemToday.month;
+
     let weekendCount = 0;
     let holidayCount = 0;
     let leaveApprovedCount = 0;
     let leavePendingCount = 0;
+    let remainingWorkingDays = 0;
+    let elapsedWorkingDays = 0;
+    let presentDays = 0;
     const typeWiseLeaves = {};
 
     activeServiceDays.forEach((d) => {
@@ -401,13 +446,26 @@ export default function EmployeeCalendarPage() {
           leavePendingCount += weight;
         }
         typeWiseLeaves[d.leave.leaveType] = (typeWiseLeaves[d.leave.leaveType] || 0) + weight;
+      } else {
+        // Standard normal duty day
+        if (isCurrentMonthSelected && d.isFuture) {
+          // Future remaining day in this month
+          remainingWorkingDays++;
+        } else {
+          // Day up to today (completed or active duty today)
+          elapsedWorkingDays++;
+          presentDays++;
+        }
       }
     });
 
+    // Total working days across the full month
+    const totalWorkingDays = elapsedWorkingDays + remainingWorkingDays;
+
+    // Rate calculation: If current month, based on elapsed working days up to today; if past month, based on all working days
+    const denom = isCurrentMonthSelected ? elapsedWorkingDays : totalWorkingDays;
+    const presentPercentage = denom > 0 ? ((presentDays / denom) * 100).toFixed(1) : 0;
     const totalLeaves = leaveApprovedCount + leavePendingCount;
-    const totalWorkingDays = Math.max(0, totalDays - weekendCount - holidayCount);
-    const presentDays = Math.max(0, totalWorkingDays - leaveApprovedCount);
-    const presentPercentage = totalWorkingDays > 0 ? ((presentDays / totalWorkingDays) * 100).toFixed(1) : 0;
 
     return {
       totalDays,
@@ -415,14 +473,17 @@ export default function EmployeeCalendarPage() {
       weekendCount,
       holidayCount,
       totalWorkingDays,
+      elapsedWorkingDays,
+      remainingWorkingDays,
       presentDays,
       presentPercentage,
       leaveApprovedCount,
       leavePendingCount,
       totalLeaves,
       typeWiseLeaves,
+      isCurrentMonthSelected,
     };
-  }, [calendarDays]);
+  }, [calendarDays, selectedYear, selectedMonth, systemToday]);
 
   // Annual balance totals
   const totalAllocated = balances.reduce((sum, b) => sum + b.allocatedDays, 0);
@@ -434,6 +495,7 @@ export default function EmployeeCalendarPage() {
   // Donut segment lengths
   const totalDays = Math.max(1, analysis.totalDays);
   const presentStroke = (analysis.presentDays / totalDays) * circumference;
+  const remainingWorkingDaysStroke = (analysis.remainingWorkingDays / totalDays) * circumference;
   const leaveApprovedStroke = (analysis.leaveApprovedCount / totalDays) * circumference;
   const leavePendingStroke = (analysis.leavePendingCount / totalDays) * circumference;
   const holidayStroke = (analysis.holidayCount / totalDays) * circumference;
@@ -443,6 +505,8 @@ export default function EmployeeCalendarPage() {
   let currentOffset = 0;
   const presentOffset = 0;
   currentOffset += presentStroke;
+  const remainingWorkingDaysOffset = currentOffset;
+  currentOffset += remainingWorkingDaysStroke;
   const leaveApprovedOffset = currentOffset;
   currentOffset += leaveApprovedStroke;
   const leavePendingOffset = currentOffset;
@@ -527,7 +591,7 @@ export default function EmployeeCalendarPage() {
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-xl flex items-center gap-1.5">
                 <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
-                {analysis.presentPercentage}% Attendance Rate
+                {analysis.presentPercentage}% Attendance {analysis.isCurrentMonthSelected ? "(Up to Today)" : "Rate"}
               </span>
             </div>
           </div>
@@ -580,7 +644,28 @@ export default function EmployeeCalendarPage() {
                     onMouseLeave={() => setHoveredSegment(null)}
                   />
 
-                  {/* 2. Approved Leaves (Warm Amber) */}
+                  {/* 2. Remaining Working Days (Vibrant Sky Blue - for Current Month) */}
+                  {analysis.remainingWorkingDays > 0 && (
+                    <circle
+                      cx="50"
+                      cy="50"
+                      r="38"
+                      fill="transparent"
+                      stroke="#0ea5e9"
+                      strokeWidth={hoveredSegment === "remaining" ? "14" : "11"}
+                      strokeDasharray={`${remainingWorkingDaysStroke} ${circumference}`}
+                      strokeDashoffset={`-${remainingWorkingDaysOffset}`}
+                      className="cursor-pointer transition-all duration-300"
+                      style={{
+                        opacity: hoveredSegment && hoveredSegment !== "remaining" ? 0.35 : 1,
+                        filter: hoveredSegment === "remaining" ? "drop-shadow(0 0 6px rgba(14, 165, 233, 0.6))" : "none",
+                      }}
+                      onMouseEnter={() => setHoveredSegment("remaining")}
+                      onMouseLeave={() => setHoveredSegment(null)}
+                    />
+                  )}
+
+                  {/* 3. Approved Leaves (Warm Amber) */}
                   <circle
                     cx="50"
                     cy="50"
@@ -599,7 +684,7 @@ export default function EmployeeCalendarPage() {
                     onMouseLeave={() => setHoveredSegment(null)}
                   />
 
-                  {/* 3. Pending Leaves (Soft Orange) */}
+                  {/* 4. Pending Leaves (Soft Orange) */}
                   <circle
                     cx="50"
                     cy="50"
@@ -618,7 +703,7 @@ export default function EmployeeCalendarPage() {
                     onMouseLeave={() => setHoveredSegment(null)}
                   />
 
-                  {/* 4. Holidays (DigiTech Crimson / Ruby) */}
+                  {/* 5. Holidays (DigiTech Crimson / Ruby) */}
                   <circle
                     cx="50"
                     cy="50"
@@ -637,7 +722,7 @@ export default function EmployeeCalendarPage() {
                     onMouseLeave={() => setHoveredSegment(null)}
                   />
 
-                  {/* 5. Weekly Offs (Indigo Slate) */}
+                  {/* 6. Weekly Offs (Indigo Slate) */}
                   <circle
                     cx="50"
                     cy="50"
@@ -662,8 +747,17 @@ export default function EmployeeCalendarPage() {
                   {hoveredSegment === "present" && (
                     <>
                       <span className="text-3xl font-black text-emerald-600">{analysis.presentDays}</span>
-                      <span className="text-[10px] font-black uppercase text-emerald-800 tracking-wider">Present Days</span>
+                      <span className="text-[10px] font-black uppercase text-emerald-800 tracking-wider">
+                        {analysis.isCurrentMonthSelected ? "Present (Up to Today)" : "Present Days"}
+                      </span>
                       <span className="text-[10px] text-emerald-600 font-bold">{analysis.presentPercentage}% rate</span>
+                    </>
+                  )}
+                  {hoveredSegment === "remaining" && (
+                    <>
+                      <span className="text-3xl font-black text-sky-600">{analysis.remainingWorkingDays}</span>
+                      <span className="text-[10px] font-black uppercase text-sky-800 tracking-wider">Remaining Days</span>
+                      <span className="text-[10px] text-sky-600 font-bold">Upcoming in {months[selectedMonth].label}</span>
                     </>
                   )}
                   {hoveredSegment === "approved_leave" && (
@@ -703,9 +797,11 @@ export default function EmployeeCalendarPage() {
                   {!hoveredSegment && (
                     <>
                       <span className="text-3xl font-black text-slate-900">{analysis.presentDays}</span>
-                      <span className="text-[10px] font-black uppercase text-slate-500 tracking-wider">Days Present</span>
+                      <span className="text-[10px] font-black uppercase text-slate-500 tracking-wider">
+                        Days Present {analysis.isCurrentMonthSelected ? "(Up to Today)" : ""}
+                      </span>
                       <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full mt-0.5">
-                        {analysis.totalWorkingDays} Work Days
+                        {analysis.presentPercentage}% Rate {analysis.isCurrentMonthSelected && analysis.remainingWorkingDays > 0 ? `• ${analysis.remainingWorkingDays} Days Left` : ""}
                       </span>
                     </>
                   )}
@@ -730,7 +826,9 @@ export default function EmployeeCalendarPage() {
                 }`}
               >
                 <div className="flex items-center justify-between text-emerald-800">
-                  <span className="text-xs font-bold uppercase tracking-wider">Present on Duty</span>
+                  <span className="text-xs font-bold uppercase tracking-wider">
+                    {analysis.isCurrentMonthSelected ? "Present (Up to Today)" : "Present on Duty"}
+                  </span>
                   <div className="w-7 h-7 rounded-lg bg-emerald-500 text-white flex items-center justify-center shadow-xs">
                     <CheckCircle className="w-4 h-4" />
                   </div>
@@ -738,58 +836,110 @@ export default function EmployeeCalendarPage() {
                 <div className="mt-3">
                   <div className="text-2xl font-black text-emerald-950">{analysis.presentDays} Days</div>
                   <div className="text-[11px] text-emerald-700 font-semibold mt-0.5">
-                    {analysis.presentPercentage}% working efficiency
+                    {analysis.isCurrentMonthSelected
+                      ? `${analysis.presentPercentage}% rate on ${analysis.elapsedWorkingDays} duty days so far`
+                      : `${analysis.presentPercentage}% working efficiency`}
                   </div>
                 </div>
               </div>
 
-              {/* Card 2: Approved Leaves (Amber) */}
-              <div
-                onMouseEnter={() => setHoveredSegment("approved_leave")}
-                onMouseLeave={() => setHoveredSegment(null)}
-                className={`p-4 rounded-2xl border transition-all duration-200 cursor-pointer ${
-                  hoveredSegment === "approved_leave"
-                    ? "bg-amber-50 border-amber-400 ring-2 ring-amber-500/30 scale-102 shadow-md"
-                    : "bg-amber-50/50 border-amber-100 hover:border-amber-300"
-                }`}
-              >
-                <div className="flex items-center justify-between text-amber-800">
-                  <span className="text-xs font-bold uppercase tracking-wider">Approved Leave</span>
-                  <div className="w-7 h-7 rounded-lg bg-amber-500 text-white flex items-center justify-center shadow-xs">
-                    <CheckCircle2 className="w-4 h-4" />
+              {/* Card 2: Remaining Working Days (for Current Month) or Approved Leaves */}
+              {analysis.isCurrentMonthSelected && analysis.remainingWorkingDays > 0 ? (
+                <div
+                  onMouseEnter={() => setHoveredSegment("remaining")}
+                  onMouseLeave={() => setHoveredSegment(null)}
+                  className={`p-4 rounded-2xl border transition-all duration-200 cursor-pointer ${
+                    hoveredSegment === "remaining"
+                      ? "bg-sky-50 border-sky-400 ring-2 ring-sky-500/30 scale-102 shadow-md"
+                      : "bg-sky-50/50 border-sky-200 hover:border-sky-300"
+                  }`}
+                >
+                  <div className="flex items-center justify-between text-sky-800">
+                    <span className="text-xs font-bold uppercase tracking-wider">Remaining Days</span>
+                    <div className="w-7 h-7 rounded-lg bg-sky-500 text-white flex items-center justify-center shadow-xs">
+                      <Clock className="w-4 h-4" />
+                    </div>
+                  </div>
+                  <div className="mt-3">
+                    <div className="text-2xl font-black text-sky-950">{analysis.remainingWorkingDays} Days</div>
+                    <div className="text-[11px] text-sky-700 font-semibold mt-0.5">
+                      Upcoming shifts in {months[selectedMonth].label}
+                    </div>
                   </div>
                 </div>
-                <div className="mt-3">
-                  <div className="text-2xl font-black text-amber-950">{analysis.leaveApprovedCount} Days</div>
-                  <div className="text-[11px] text-amber-700 font-semibold mt-0.5">
-                    Sanctioned by Admin
+              ) : (
+                <div
+                  onMouseEnter={() => setHoveredSegment("approved_leave")}
+                  onMouseLeave={() => setHoveredSegment(null)}
+                  className={`p-4 rounded-2xl border transition-all duration-200 cursor-pointer ${
+                    hoveredSegment === "approved_leave"
+                      ? "bg-amber-50 border-amber-400 ring-2 ring-amber-500/30 scale-102 shadow-md"
+                      : "bg-amber-50/50 border-amber-100 hover:border-amber-300"
+                  }`}
+                >
+                  <div className="flex items-center justify-between text-amber-800">
+                    <span className="text-xs font-bold uppercase tracking-wider">Approved Leave</span>
+                    <div className="w-7 h-7 rounded-lg bg-amber-500 text-white flex items-center justify-center shadow-xs">
+                      <CheckCircle2 className="w-4 h-4" />
+                    </div>
+                  </div>
+                  <div className="mt-3">
+                    <div className="text-2xl font-black text-amber-950">{analysis.leaveApprovedCount} Days</div>
+                    <div className="text-[11px] text-amber-700 font-semibold mt-0.5">
+                      Sanctioned by Admin
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
 
-              {/* Card 3: Pending Leaves (Orange) */}
-              <div
-                onMouseEnter={() => setHoveredSegment("pending_leave")}
-                onMouseLeave={() => setHoveredSegment(null)}
-                className={`p-4 rounded-2xl border transition-all duration-200 cursor-pointer ${
-                  hoveredSegment === "pending_leave"
-                    ? "bg-orange-50 border-orange-400 ring-2 ring-orange-500/30 scale-102 shadow-md"
-                    : "bg-orange-50/50 border-orange-100 hover:border-orange-300"
-                }`}
-              >
-                <div className="flex items-center justify-between text-orange-800">
-                  <span className="text-xs font-bold uppercase tracking-wider">Pending Leave</span>
-                  <div className="w-7 h-7 rounded-lg bg-orange-500 text-white flex items-center justify-center shadow-xs">
-                    <Clock className="w-4 h-4" />
+              {/* Card 3: Approved Leave (if Remaining was shown in Card 2) or Pending Leave */}
+              {analysis.isCurrentMonthSelected && analysis.remainingWorkingDays > 0 ? (
+                <div
+                  onMouseEnter={() => setHoveredSegment("approved_leave")}
+                  onMouseLeave={() => setHoveredSegment(null)}
+                  className={`p-4 rounded-2xl border transition-all duration-200 cursor-pointer ${
+                    hoveredSegment === "approved_leave"
+                      ? "bg-amber-50 border-amber-400 ring-2 ring-amber-500/30 scale-102 shadow-md"
+                      : "bg-amber-50/50 border-amber-100 hover:border-amber-300"
+                  }`}
+                >
+                  <div className="flex items-center justify-between text-amber-800">
+                    <span className="text-xs font-bold uppercase tracking-wider">Approved Leave</span>
+                    <div className="w-7 h-7 rounded-lg bg-amber-500 text-white flex items-center justify-center shadow-xs">
+                      <CheckCircle2 className="w-4 h-4" />
+                    </div>
+                  </div>
+                  <div className="mt-3">
+                    <div className="text-2xl font-black text-amber-950">{analysis.leaveApprovedCount} Days</div>
+                    <div className="text-[11px] text-amber-700 font-semibold mt-0.5">
+                      Sanctioned by Admin
+                    </div>
                   </div>
                 </div>
-                <div className="mt-3">
-                  <div className="text-2xl font-black text-orange-950">{analysis.leavePendingCount} Days</div>
-                  <div className="text-[11px] text-orange-700 font-semibold mt-0.5">
-                    Awaiting admin review
+              ) : (
+                <div
+                  onMouseEnter={() => setHoveredSegment("pending_leave")}
+                  onMouseLeave={() => setHoveredSegment(null)}
+                  className={`p-4 rounded-2xl border transition-all duration-200 cursor-pointer ${
+                    hoveredSegment === "pending_leave"
+                      ? "bg-orange-50 border-orange-400 ring-2 ring-orange-500/30 scale-102 shadow-md"
+                      : "bg-orange-50/50 border-orange-100 hover:border-orange-300"
+                  }`}
+                >
+                  <div className="flex items-center justify-between text-orange-800">
+                    <span className="text-xs font-bold uppercase tracking-wider">Pending Leave</span>
+                    <div className="w-7 h-7 rounded-lg bg-orange-500 text-white flex items-center justify-center shadow-xs">
+                      <Clock className="w-4 h-4" />
+                    </div>
+                  </div>
+                  <div className="mt-3">
+                    <div className="text-2xl font-black text-orange-950">{analysis.leavePendingCount} Days</div>
+                    <div className="text-[11px] text-orange-700 font-semibold mt-0.5">
+                      Awaiting admin review
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
 
               {/* Card 4: Holidays (DigiTech Crimson) */}
               <div
@@ -834,7 +984,11 @@ export default function EmployeeCalendarPage() {
                 <div className="mt-3">
                   <div className="text-2xl font-black text-indigo-950">{analysis.weekendCount} Days</div>
                   <div className="text-[11px] text-indigo-700 font-semibold mt-0.5">
-                    Saturday & Sunday
+                    {calendarSetting?.weeklyOffDay === "SATURDAY_SUNDAY"
+                      ? "Sat & Sun"
+                      : calendarSetting?.weeklyOffDay === "SUNDAY_ALT_SATURDAY"
+                      ? "Sun + Alt Sat"
+                      : "Every Sunday"}
                   </div>
                 </div>
               </div>
@@ -850,7 +1004,9 @@ export default function EmployeeCalendarPage() {
                 <div className="mt-3">
                   <div className="text-2xl font-black text-slate-900">{analysis.totalWorkingDays} Days</div>
                   <div className="text-[11px] text-slate-500 font-semibold mt-0.5">
-                    Excluding weekends & holidays
+                    {analysis.isCurrentMonthSelected
+                      ? `${analysis.elapsedWorkingDays} completed • ${analysis.remainingWorkingDays} remaining`
+                      : "Excluding weekends & holidays"}
                   </div>
                 </div>
               </div>
@@ -1000,8 +1156,11 @@ export default function EmployeeCalendarPage() {
                 </button>
                 <button
                   onClick={nextMonth}
-                  className="p-1.5 text-white hover:bg-white/20 rounded-lg transition cursor-pointer"
-                  title="Next Month"
+                  disabled={!canGoNext}
+                  className={`p-1.5 text-white rounded-lg transition ${
+                    !canGoNext ? "opacity-30 cursor-not-allowed" : "hover:bg-white/20 cursor-pointer"
+                  }`}
+                  title={!canGoNext ? "Cannot view future months beyond current month" : "Next Month"}
                 >
                   <ChevronRight className="w-4 h-4" />
                 </button>
@@ -1027,6 +1186,9 @@ export default function EmployeeCalendarPage() {
               const isHoliday = !!cell.holiday;
               const isOff = cell.isWeekend;
               const isPre = cell.isCurrentMonth && cell.isPreJoining;
+              const isFutureWorking = cell.isCurrentMonth && !isPre && !isHoliday && !isLeave && !isOff && cell.isFuture;
+              const isTodayDuty = cell.isCurrentMonth && !isPre && !isHoliday && !isLeave && !isOff && cell.isToday;
+              const isPastDuty = cell.isCurrentMonth && !isPre && !isHoliday && !isLeave && !isOff && cell.isPast;
 
               return (
                 <div
@@ -1036,12 +1198,16 @@ export default function EmployeeCalendarPage() {
                       ? "bg-slate-50/80 text-slate-300"
                       : isPre
                       ? "bg-slate-100/50 text-slate-400 border-dashed"
+                      : cell.isToday
+                      ? "bg-emerald-50/40 ring-1 ring-inset ring-emerald-400"
                       : isHoliday
                       ? "bg-rose-50/40"
                       : isLeave
                       ? "bg-amber-50/40"
                       : isOff
                       ? "bg-slate-100/40"
+                      : isFutureWorking
+                      ? "bg-slate-50/50 text-slate-600"
                       : "bg-white hover:bg-emerald-50/20"
                   }`}
                 >
@@ -1053,6 +1219,8 @@ export default function EmployeeCalendarPage() {
                           ? "text-slate-300"
                           : isPre
                           ? "text-slate-400"
+                          : cell.isToday
+                          ? "text-emerald-700 font-black"
                           : cell.isWeekend
                           ? "text-indigo-600 font-extrabold"
                           : "text-slate-800"
@@ -1065,6 +1233,19 @@ export default function EmployeeCalendarPage() {
                     {cell.isCurrentMonth && isPre && (
                       <span className="text-[8px] font-bold text-slate-400 bg-slate-200/70 px-1.5 py-0.2 rounded">
                         Pre-Joining
+                      </span>
+                    )}
+
+                    {cell.isCurrentMonth && cell.isToday && (
+                      <span className="text-[8px] font-black text-emerald-800 bg-emerald-100 border border-emerald-300 px-1.5 py-0.2 rounded flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse"></span>
+                        Today
+                      </span>
+                    )}
+
+                    {cell.isCurrentMonth && isFutureWorking && (
+                      <span className="text-[8px] font-bold text-sky-700 bg-sky-50 border border-sky-200 px-1.5 py-0.2 rounded">
+                        Remaining
                       </span>
                     )}
 
@@ -1093,6 +1274,7 @@ export default function EmployeeCalendarPage() {
                       </div>
                     )}
 
+                    {/* Holiday */}
                     {cell.isCurrentMonth && !isPre && isHoliday && (
                       <div className="p-1 rounded-lg bg-rose-100 border border-rose-200 text-rose-900 text-[10px] font-bold leading-tight">
                         <span className="flex items-center gap-1">
@@ -1102,6 +1284,7 @@ export default function EmployeeCalendarPage() {
                       </div>
                     )}
 
+                    {/* Leave */}
                     {cell.isCurrentMonth && !isPre && isLeave && (
                       <div
                         className={`p-1 rounded-lg border text-[10px] font-bold leading-tight ${
@@ -1120,12 +1303,56 @@ export default function EmployeeCalendarPage() {
                       </div>
                     )}
 
-                    {/* Present Working Day: Login & Logout Timings */}
-                    {cell.isCurrentMonth && !isPre && !isHoliday && !isLeave && !isOff && (
-                      <div className="bg-emerald-50/90 border border-emerald-200/90 rounded-lg p-1.5 text-[10px] space-y-1 shadow-2xs">
+                    {/* FUTURE WORKING DAY: Remaining / Upcoming Scheduled Shift */}
+                    {isFutureWorking && (
+                      <div className="bg-slate-50/90 border border-slate-200 rounded-lg p-1.5 text-[10px] space-y-1 shadow-2xs">
+                        <div className="flex items-center justify-between font-bold text-slate-700">
+                          <span className="flex items-center gap-1 text-[9px] text-slate-500 uppercase tracking-wider">
+                            <Clock className="w-2.5 h-2.5 text-sky-500" />
+                            Remaining
+                          </span>
+                          <span className="text-[9px] text-sky-700 font-extrabold bg-sky-50 border border-sky-200 px-1 py-0.2 rounded">
+                            Scheduled
+                          </span>
+                        </div>
+                        <div className="text-[9px] text-slate-400 font-medium pt-0.5 border-t border-slate-200/60 flex items-center justify-between">
+                          <span>Shift: 9h 15m</span>
+                          <span>Upcoming</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* TODAY'S ACTIVE DUTY: In Progress */}
+                    {isTodayDuty && (
+                      <div className="bg-emerald-50 border border-emerald-300 rounded-lg p-1.5 text-[10px] space-y-1 shadow-2xs ring-2 ring-emerald-500/20">
                         <div className="flex items-center justify-between font-black text-emerald-900">
                           <span className="flex items-center gap-1">
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse"></span>
+                            Today (Active)
+                          </span>
+                          <span className="text-[9px] text-emerald-700 font-extrabold bg-emerald-100 px-1 py-0.2 rounded">
+                            In Progress
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-[9px] text-emerald-950 font-semibold pt-1 border-t border-emerald-200/60">
+                          <span className="flex items-center gap-0.5" title="Login / Entry Time">
+                            <LogIn className="w-2.5 h-2.5 text-emerald-700 shrink-0" />
+                            <strong>09:15 AM</strong>
+                          </span>
+                          <span className="flex items-center gap-0.5" title="Logout / Exit Time">
+                            <LogOut className="w-2.5 h-2.5 text-emerald-700 shrink-0" />
+                            <strong>06:30 PM</strong>
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* PAST COMPLETED WORKING DAY: Login & Logout Timings */}
+                    {isPastDuty && (
+                      <div className="bg-emerald-50/90 border border-emerald-200/90 rounded-lg p-1.5 text-[10px] space-y-1 shadow-2xs">
+                        <div className="flex items-center justify-between font-black text-emerald-900">
+                          <span className="flex items-center gap-1">
+                            <CheckCircle className="w-2.5 h-2.5 text-emerald-600 shrink-0" />
                             Present
                           </span>
                           <span className="text-[9px] text-emerald-700 font-extrabold bg-emerald-100/90 px-1 py-0.2 rounded">
@@ -1145,10 +1372,14 @@ export default function EmployeeCalendarPage() {
                       </div>
                     )}
 
-                    {/* Off-Day / Weekend / Holiday: Comp Off Claim or Approved Status */}
+                    {/* Off-Day / Weekend / Holiday: Comp Off Claim or Scheduled Off */}
                     {cell.isCurrentMonth && !isPre && (isOff || isHoliday) && !isLeave && (
                       <div className="mt-1 space-y-1">
-                        {cell.compOff ? (
+                        {cell.isFuture ? (
+                          <div className="p-1 rounded-lg bg-slate-100/70 border border-slate-200/60 text-slate-400 text-[9px] font-semibold text-center">
+                            Scheduled Off
+                          </div>
+                        ) : cell.compOff ? (
                           <div
                             className={`p-1.5 rounded-lg border text-[10px] space-y-1 shadow-2xs ${
                               cell.compOff.status === "APPROVED"
@@ -1217,6 +1448,10 @@ export default function EmployeeCalendarPage() {
               <div className="flex items-center gap-1.5">
                 <span className="w-3 h-3 rounded-full bg-emerald-500" />
                 <span className="font-semibold text-emerald-800">Present (Duty Login / Logout)</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-3 h-3 rounded-full bg-sky-500" />
+                <span className="font-semibold text-sky-800">Remaining Working Day (Upcoming)</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <span className="w-3 h-3 rounded-full bg-amber-500" />
