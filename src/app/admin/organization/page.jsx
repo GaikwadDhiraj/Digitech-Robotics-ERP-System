@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import DashboardShell from "@/components/DashboardShell";
+import Pagination from "@/components/Pagination";
 import { useAuth } from "@/context/AuthContext";
 import {
   Building2,
@@ -26,6 +27,8 @@ export default function AdminOrganizationPage() {
   const [departments, setDepartments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 15;
 
   // Modals
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -158,6 +161,16 @@ export default function AdminOrganizationPage() {
       d.description?.toLowerCase().includes(q)
     );
   });
+
+  // Reset pagination on search change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
+  const paginatedDepts = filteredDepts.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
 
   return (
     <DashboardShell>
@@ -300,7 +313,7 @@ export default function AdminOrganizationPage() {
               </button>
             </div>
           ) : (
-            filteredDepts.map((dept) => {
+            paginatedDepts.map((dept) => {
               const assignedCount =
                 employees?.filter(
                   (e) => e.department?.toLowerCase() === dept.name?.toLowerCase()
@@ -371,6 +384,15 @@ export default function AdminOrganizationPage() {
             })
           )}
         </div>
+
+        <Pagination
+          currentPage={currentPage}
+          totalItems={filteredDepts.length}
+          itemsPerPage={ITEMS_PER_PAGE}
+          onPageChange={setCurrentPage}
+          itemLabel="departments"
+          className="rounded-2xl border border-slate-200 bg-white"
+        />
       </div>
 
       {/* CREATE / EDIT DEPARTMENT MODAL */}

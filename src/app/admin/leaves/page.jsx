@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import DashboardShell from "@/components/DashboardShell";
+import Pagination from "@/components/Pagination";
 import { useAuth } from "@/context/AuthContext";
 import {
   CalendarCheck,
@@ -58,6 +59,9 @@ export default function AdminLeaveSanctionsPage() {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("PENDING");
   const [searchTerm, setSearchTerm] = useState("");
+  const [requestsPage, setRequestsPage] = useState(1);
+  const [compOffPage, setCompOffPage] = useState(1);
+  const ITEMS_PER_PAGE = 15;
 
   // Sanction Modal (Regular Leave)
   const [selectedLeave, setSelectedLeave] = useState(null);
@@ -460,6 +464,25 @@ export default function AdminLeaveSanctionsPage() {
     return matchesStatus && matchesSearch;
   });
 
+  // Reset pagination on filter or search changes
+  useEffect(() => {
+    setRequestsPage(1);
+  }, [statusFilter, searchTerm]);
+
+  useEffect(() => {
+    setCompOffPage(1);
+  }, [compOffStatusFilter, searchTerm]);
+
+  const paginatedLeaves = filteredLeaves.slice(
+    (requestsPage - 1) * ITEMS_PER_PAGE,
+    requestsPage * ITEMS_PER_PAGE
+  );
+
+  const paginatedCompOffs = filteredCompOffs.slice(
+    (compOffPage - 1) * ITEMS_PER_PAGE,
+    compOffPage * ITEMS_PER_PAGE
+  );
+
   return (
     <DashboardShell>
       <div className="space-y-6">
@@ -734,7 +757,7 @@ export default function AdminLeaveSanctionsPage() {
                 </div>
               ) : (
                 <div className="divide-y divide-slate-100">
-                  {filteredLeaves.map((leave) => {
+                  {paginatedLeaves.map((leave) => {
                     const isPending = leave.status === "PENDING";
                     const isApproved = leave.status === "APPROVED";
                     const isRejected = leave.status === "REJECTED";
@@ -869,6 +892,14 @@ export default function AdminLeaveSanctionsPage() {
                   })}
                 </div>
               )}
+
+              <Pagination
+                currentPage={requestsPage}
+                totalItems={filteredLeaves.length}
+                itemsPerPage={ITEMS_PER_PAGE}
+                onPageChange={setRequestsPage}
+                itemLabel="leave requests"
+              />
             </div>
           </div>
         )}
@@ -987,7 +1018,7 @@ export default function AdminLeaveSanctionsPage() {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 gap-4">
-                  {filteredCompOffs.map((claim) => {
+                  {paginatedCompOffs.map((claim) => {
                     const claimDate = new Date(claim.date);
                     const formattedDate = claimDate.toLocaleDateString("en-IN", {
                       weekday: "long",
@@ -1096,6 +1127,14 @@ export default function AdminLeaveSanctionsPage() {
                   })}
                 </div>
               )}
+
+              <Pagination
+                currentPage={compOffPage}
+                totalItems={filteredCompOffs.length}
+                itemsPerPage={ITEMS_PER_PAGE}
+                onPageChange={setCompOffPage}
+                itemLabel="comp off claims"
+              />
             </div>
           </div>
         )}

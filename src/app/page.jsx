@@ -66,8 +66,8 @@ export default function HomePage() {
       </header>
 
       {/* Hero Section */}
-      <main className="flex-1 flex flex-col items-center justify-center px-6 py-12 max-w-5xl mx-auto text-center">
-        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-rose-950/60 border border-rose-800/60 text-rose-300 text-xs font-semibold mb-6">
+      <main className="flex-1 flex flex-col items-center justify-start pt-4 sm:pt-6 pb-12 px-6 max-w-5xl mx-auto text-center">
+        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-rose-950/60 border border-rose-800/60 text-rose-300 text-xs font-semibold mb-3 sm:mb-4">
           <Sparkles className="w-3.5 h-3.5 text-rose-400" />
           Digitech Robotics Enterprise Resource Planning
         </div>

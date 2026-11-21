@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import DashboardShell from "@/components/DashboardShell";
+import Pagination from "@/components/Pagination";
 import { useAuth } from "@/context/AuthContext";
 import {
   Users,
@@ -45,6 +46,8 @@ export default function AdminEmployeesPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedDept, setSelectedDept] = useState("ALL");
   const [selectedDesignation, setSelectedDesignation] = useState("ALL");
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 15;
 
   // Modals
   const [isAddEditModalOpen, setIsAddEditModalOpen] = useState(false);
@@ -327,6 +330,16 @@ export default function AdminEmployeesPage() {
     return matchesSearch && matchesDept && matchesDesignation;
   });
 
+  // Reset to page 1 whenever search or filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedDept, selectedDesignation]);
+
+  const paginatedEmployees = filteredEmployees.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+
   return (
     <DashboardShell>
       <div className="space-y-6">
@@ -464,7 +477,7 @@ export default function AdminEmployeesPage() {
                     </td>
                   </tr>
                 ) : (
-                  filteredEmployees.map((emp) => {
+                  paginatedEmployees.map((emp) => {
                     const isActive = emp.status === "ACTIVE";
                     return (
                       <tr key={emp.id} className="hover:bg-slate-50/60 transition group">
@@ -575,6 +588,14 @@ export default function AdminEmployeesPage() {
               </tbody>
             </table>
           </div>
+
+          <Pagination
+            currentPage={currentPage}
+            totalItems={filteredEmployees.length}
+            itemsPerPage={ITEMS_PER_PAGE}
+            onPageChange={setCurrentPage}
+            itemLabel="employees"
+          />
         </div>
 
         {/* MODAL 1: Add or Edit Employee (All Requested Fields) */}

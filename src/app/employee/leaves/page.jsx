@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import DashboardShell from "@/components/DashboardShell";
+import Pagination from "@/components/Pagination";
 import { useAuth } from "@/context/AuthContext";
 import {
   CalendarPlus,
@@ -32,6 +33,13 @@ export default function EmployeeLeavePage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [notification, setNotification] = useState({ type: "", message: "" });
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 15;
+
+  const paginatedLeaves = leaves.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
 
   const [formData, setFormData] = useState({
     leaveType: "Casual Leave",
@@ -544,7 +552,7 @@ export default function EmployeeLeavePage() {
                 </div>
               ) : (
                 <div className="divide-y divide-slate-100">
-                  {leaves.map((leave) => {
+                  {paginatedLeaves.map((leave) => {
                     const isPending = leave.status === "PENDING";
                     const isApproved = leave.status === "APPROVED";
                     const isRejected = leave.status === "REJECTED";
@@ -659,6 +667,14 @@ export default function EmployeeLeavePage() {
                   })}
                 </div>
               )}
+
+              <Pagination
+                currentPage={currentPage}
+                totalItems={leaves.length}
+                itemsPerPage={ITEMS_PER_PAGE}
+                onPageChange={setCurrentPage}
+                itemLabel="leave records"
+              />
             </div>
           </div>
         </div>
