@@ -15,6 +15,35 @@ async function withRetry(fn, retries = 3, delayMs = 1500) {
   }
 }
 
+// Helper to seed annual leave balances for any user in DB
+async function ensureLeaveBalances(userId) {
+  try {
+    const policies = await prisma.leaveTypePolicy.findMany().catch(() => []);
+    for (const pol of policies) {
+      await prisma.leaveBalance.upsert({
+        where: {
+          userId_year_leaveType: {
+            userId,
+            year: 2026,
+            leaveType: pol.name,
+          },
+        },
+        update: {},
+        create: {
+          userId,
+          year: 2026,
+          leaveType: pol.name,
+          allocatedDays: pol.defaultDaysPerYear,
+          usedDays: 0,
+          remainingDays: pol.defaultDaysPerYear,
+        },
+      }).catch(() => {});
+    }
+  } catch (e) {
+    // Non-blocking
+  }
+}
+
 export async function POST(request) {
   try {
     let clerkUser = null;
@@ -46,74 +75,8 @@ export async function POST(request) {
       normalizedEmail.split("@")[0];
     const avatarUrl = body.avatarUrl || clerkUser?.imageUrl || null;
 
-    // 1. Check if this is the Super Admin
-    if (normalizedEmail === ADMIN_EMAIL.toLowerCase()) {
-      let admin = await withRetry(() =>
-        prisma.user.findFirst({
-          where: { email: { equals: normalizedEmail, mode: "insensitive" } },
-          include: { leaveBalances: true },
-        })
-      );
-
-      if (!admin) {
-        // Create Admin if not present
-        admin = await prisma.user.create({
-          data: {
-            employeeId: "Digitech-Adm-001",
-            clerkId,
-            name: "Dhiraj Gaikwad",
-            email: normalizedEmail,
-            personalEmail: normalizedEmail,
-            department: "Administration",
-            designation: "Administrator / MD",
-            role: "ADMIN",
-            status: "ACTIVE",
-            avatarUrl,
-            salary: 150000,
-            joinDate: new Date(),
-          },
-          include: { leaveBalances: true },
-        });
-
-        // Allocate leave policies
-        const policies = await prisma.leaveTypePolicy.findMany().catch(() => []);
-        for (const pol of policies) {
-          await prisma.leaveBalance.upsert({
-            where: {
-              userId_year_leaveType: {
-                userId: admin.id,
-                year: 2026,
-                leaveType: pol.name,
-              },
-            },
-            update: {},
-            create: {
-              userId: admin.id,
-              year: 2026,
-              leaveType: pol.name,
-              allocatedDays: pol.defaultDaysPerYear,
-              usedDays: 0,
-              remainingDays: pol.defaultDaysPerYear,
-            },
-          }).catch(() => {});
-        }
-      } else if (clerkId && (!admin.clerkId || admin.clerkId !== clerkId)) {
-        admin = await prisma.user.update({
-          where: { id: admin.id },
-          data: { clerkId, avatarUrl: avatarUrl || admin.avatarUrl },
-          include: { leaveBalances: true },
-        });
-      }
-
-      return NextResponse.json({
-        success: true,
-        isAuthorized: true,
-        user: admin,
-      });
-    }
-
-    // 2. Check if this is an employee pre-registered by the Admin
-    let employee = await withRetry(() =>
+    // Search for existing user in database
+    let user = await withRetry(() =>
       prisma.user.findFirst({
         where: {
           OR: [
@@ -126,48 +89,114 @@ export async function POST(request) {
       })
     );
 
-    if (!employee) {
-      // User is NOT registered by Admin -> Access Denied!
-      return NextResponse.json(
-        {
-          success: false,
-          isAuthorized: false,
-          error: "ACCESS_DENIED",
-          message: `Your email (${normalizedEmail}) has not been registered by the Administrator. Please contact ${ADMIN_EMAIL} to add your official profile to Digitech ERP.`,
-        },
-        { status: 403 }
-      );
-    }
+    const isSuperAdmin = normalizedEmail === ADMIN_EMAIL.toLowerCase();
 
-    // Check if employee account is ACTIVE
-    if (employee.status === "INACTIVE") {
-      return NextResponse.json(
-        {
-          success: false,
-          isAuthorized: false,
-          error: "ACCOUNT_INACTIVE",
-          message: "Your employee account is currently deactivated. Please contact your Administrator.",
-        },
-        { status: 403 }
-      );
-    }
+    // 1. Super Admin (dvgaikwad333@gmail.com)
+    if (isSuperAdmin) {
+      if (!user) {
+        user = await prisma.user.create({
+          data: {
+            employeeId: "DG-26-0001",
+            clerkId,
+            name: "Dhiraj Gaikwad",
+            email: normalizedEmail,
+            personalEmail: normalizedEmail,
+            department: "Admin Department",
+            designation: "Administrator / MD",
+            role: "ADMIN",
+            status: "ACTIVE",
+            avatarUrl,
+            salary: 1500000,
+            joinDate: new Date("2026-01-01"),
+          },
+          include: { leaveBalances: true },
+        });
+      } else {
+        user = await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            role: "ADMIN",
+            department: user.department || "Admin Department",
+            clerkId: clerkId || user.clerkId,
+            avatarUrl: avatarUrl || user.avatarUrl,
+          },
+          include: { leaveBalances: true },
+        });
+      }
+      await ensureLeaveBalances(user.id);
 
-    // Link clerkId & avatarUrl to registered employee
-    if (clerkId && (!employee.clerkId || employee.clerkId !== clerkId)) {
-      employee = await prisma.user.update({
-        where: { id: employee.id },
-        data: {
-          clerkId,
-          avatarUrl: avatarUrl || employee.avatarUrl,
-        },
-        include: { leaveBalances: true },
+      return NextResponse.json({
+        success: true,
+        isAuthorized: true,
+        user,
       });
     }
+
+    // 2. Existing user in DB (pre-registered by Admin as ADMIN or EMPLOYEE)
+    if (user) {
+      // Check if deactivated
+      if (user.status === "INACTIVE") {
+        return NextResponse.json(
+          {
+            success: false,
+            isAuthorized: false,
+            error: "ACCOUNT_INACTIVE",
+            message: "Your account is currently deactivated. Please contact your Administrator.",
+          },
+          { status: 403 }
+        );
+      }
+
+      // Link clerkId & avatarUrl if not already linked
+      if (clerkId && (!user.clerkId || user.clerkId !== clerkId || (avatarUrl && !user.avatarUrl))) {
+        user = await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            clerkId: clerkId || user.clerkId,
+            avatarUrl: avatarUrl || user.avatarUrl,
+          },
+          include: { leaveBalances: true },
+        });
+      }
+      await ensureLeaveBalances(user.id);
+
+      return NextResponse.json({
+        success: true,
+        isAuthorized: true,
+        user,
+      });
+    }
+
+    // 3. User does NOT exist in DB yet -> COMPULSORY SAVE TO DATABASE
+    // "who ever try to login or signing the user login data should be goes to the database in the user table complusary"
+    const userCount = await prisma.user.count().catch(() => 0);
+    const joinYear = (new Date().getFullYear() % 100).toString().padStart(2, "0");
+    const generatedId = `DG-${joinYear}-${String(userCount + 1).padStart(4, "0")}`;
+
+    user = await prisma.user.create({
+      data: {
+        employeeId: generatedId,
+        clerkId,
+        name,
+        email: normalizedEmail,
+        personalEmail: normalizedEmail,
+        department: "Robotics Engineering",
+        designation: "Associate",
+        role: "EMPLOYEE",
+        status: "ACTIVE",
+        avatarUrl,
+        salary: 0,
+        joinDate: new Date(),
+      },
+      include: { leaveBalances: true },
+    });
+
+    await ensureLeaveBalances(user.id);
 
     return NextResponse.json({
       success: true,
       isAuthorized: true,
-      user: employee,
+      user,
     });
   } catch (error) {
     console.error("Auth sync error:", error);
@@ -195,37 +224,12 @@ export async function GET() {
 
     const normalizedEmail = email.trim().toLowerCase();
     const clerkId = clerkUser.id;
+    const name =
+      [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ") ||
+      normalizedEmail.split("@")[0];
     const avatarUrl = clerkUser.imageUrl;
 
-    if (normalizedEmail === ADMIN_EMAIL.toLowerCase()) {
-      let admin = await prisma.user.findFirst({
-        where: { email: { equals: normalizedEmail, mode: "insensitive" } },
-        include: { leaveBalances: true },
-      });
-
-      if (!admin) {
-        admin = await prisma.user.create({
-          data: {
-            employeeId: "Digitech-Adm-001",
-            clerkId,
-            name: "Dhiraj Gaikwad",
-            email: normalizedEmail,
-            personalEmail: normalizedEmail,
-            department: "Administration",
-            designation: "Administrator / MD",
-            role: "ADMIN",
-            status: "ACTIVE",
-            avatarUrl,
-            salary: 150000,
-            joinDate: new Date(),
-          },
-          include: { leaveBalances: true },
-        });
-      }
-      return NextResponse.json({ success: true, isAuthorized: true, user: admin });
-    }
-
-    const employee = await prisma.user.findFirst({
+    let user = await prisma.user.findFirst({
       where: {
         OR: [
           { email: { equals: normalizedEmail, mode: "insensitive" } },
@@ -236,19 +240,93 @@ export async function GET() {
       include: { leaveBalances: true },
     });
 
-    if (!employee) {
-      return NextResponse.json(
-        {
-          success: false,
-          isAuthorized: false,
-          error: "ACCESS_DENIED",
-          message: `Your email (${normalizedEmail}) has not been registered by the Administrator. Please contact ${ADMIN_EMAIL}.`,
-        },
-        { status: 403 }
-      );
+    const isSuperAdmin = normalizedEmail === ADMIN_EMAIL.toLowerCase();
+
+    if (isSuperAdmin) {
+      if (!user) {
+        user = await prisma.user.create({
+          data: {
+            employeeId: "DG-26-0001",
+            clerkId,
+            name: "Dhiraj Gaikwad",
+            email: normalizedEmail,
+            personalEmail: normalizedEmail,
+            department: "Admin Department",
+            designation: "Administrator / MD",
+            role: "ADMIN",
+            status: "ACTIVE",
+            avatarUrl,
+            salary: 1500000,
+            joinDate: new Date("2026-01-01"),
+          },
+          include: { leaveBalances: true },
+        });
+      } else {
+        user = await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            role: "ADMIN",
+            clerkId: clerkId || user.clerkId,
+            avatarUrl: avatarUrl || user.avatarUrl,
+          },
+          include: { leaveBalances: true },
+        });
+      }
+      await ensureLeaveBalances(user.id);
+      return NextResponse.json({ success: true, isAuthorized: true, user });
     }
 
-    return NextResponse.json({ success: true, isAuthorized: true, user: employee });
+    if (user) {
+      if (user.status === "INACTIVE") {
+        return NextResponse.json(
+          {
+            success: false,
+            isAuthorized: false,
+            error: "ACCOUNT_INACTIVE",
+            message: "Your account is currently deactivated. Please contact your Administrator.",
+          },
+          { status: 403 }
+        );
+      }
+      if (clerkId && (!user.clerkId || user.clerkId !== clerkId || (avatarUrl && !user.avatarUrl))) {
+        user = await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            clerkId: clerkId || user.clerkId,
+            avatarUrl: avatarUrl || user.avatarUrl,
+          },
+          include: { leaveBalances: true },
+        });
+      }
+      await ensureLeaveBalances(user.id);
+      return NextResponse.json({ success: true, isAuthorized: true, user });
+    }
+
+    // Compulsory create in database
+    const userCount = await prisma.user.count().catch(() => 0);
+    const joinYear = (new Date().getFullYear() % 100).toString().padStart(2, "0");
+    const generatedId = `DG-${joinYear}-${String(userCount + 1).padStart(4, "0")}`;
+
+    user = await prisma.user.create({
+      data: {
+        employeeId: generatedId,
+        clerkId,
+        name,
+        email: normalizedEmail,
+        personalEmail: normalizedEmail,
+        department: "Robotics Engineering",
+        designation: "Associate",
+        role: "EMPLOYEE",
+        status: "ACTIVE",
+        avatarUrl,
+        salary: 0,
+        joinDate: new Date(),
+      },
+      include: { leaveBalances: true },
+    });
+
+    await ensureLeaveBalances(user.id);
+    return NextResponse.json({ success: true, isAuthorized: true, user });
   } catch (error) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }

@@ -115,8 +115,11 @@ export default function AdminEmployeesPage() {
     "ALL",
     ...(departmentsList.length > 0
       ? departmentsList.map((d) => d.name)
-      : ["Robotics Engineering", "Industrial Automation", "Software Development", "Operations & HR", "Research & Development"]),
+      : ["Admin Department", "Robotics Engineering", "Industrial Automation", "Software Development", "Operations & HR", "Research & Development"]),
   ];
+  if (!departments.includes("Admin Department")) {
+    departments.splice(1, 0, "Admin Department");
+  }
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -129,7 +132,7 @@ export default function AdminEmployeesPage() {
     const yearShort = (new Date(joinToday).getFullYear() % 100).toString().padStart(2, "0");
     const count = employeeList.length + 1;
     const generatedId = `DG-${yearShort}-${String(count).padStart(4, "0")}`;
-    const defaultDept = departmentsList[0]?.name || "Robotics Engineering";
+    const defaultDept = departmentsList.find((d) => d.name !== "Admin Department")?.name || "Robotics Engineering";
     setFormData({
       name: "",
       email: "",
@@ -252,7 +255,10 @@ export default function AdminEmployeesPage() {
         });
         const result = await res.json();
         if (result.success) {
-          setNotification({ type: "success", message: `New employee ${formData.name} added successfully with designation.` });
+          const successMsg = formData.role === "ADMIN"
+            ? `Administrator ${formData.name} added successfully with Admin access!`
+            : `New employee ${formData.name} added successfully with designation.`;
+          setNotification({ type: "success", message: successMsg });
           setIsAddEditModalOpen(false);
           refreshUsers();
         } else {
@@ -494,8 +500,15 @@ export default function AdminEmployeesPage() {
                               )}
                             </div>
                             <div>
-                              <div className="font-bold text-slate-900 text-sm group-hover:text-indigo-600 transition">
-                                {emp.name}
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-slate-900 text-sm group-hover:text-indigo-600 transition">
+                                  {emp.name}
+                                </span>
+                                {emp.role === "ADMIN" && (
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-850 border border-rose-300 flex items-center gap-1 shadow-2xs">
+                                    <ShieldCheck className="w-3 h-3 text-rose-700" /> Admin
+                                  </span>
+                                )}
                               </div>
                               <div className="text-[11px] font-mono text-slate-400 flex items-center gap-1.5 mt-0.5">
                                 <span className="bg-slate-100 px-1.5 py-0.2 rounded font-medium">{emp.employeeId}</span>
@@ -569,11 +582,11 @@ export default function AdminEmployeesPage() {
                               <Edit2 className="w-4 h-4" />
                             </button>
 
-                            {/* Delete Employee */}
-                            {emp.role !== "ADMIN" && (
+                            {/* Delete Employee / Admin (Protect Super Admin) */}
+                            {emp.email?.toLowerCase() !== "dvgaikwad333@gmail.com" && (
                               <button
                                 onClick={() => handleDeleteEmployee(emp.id, emp.name)}
-                                title="Delete Employee"
+                                title={emp.role === "ADMIN" ? "Delete Admin Account" : "Delete Employee"}
                                 className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
                               >
                                 <Trash2 className="w-4 h-4" />
@@ -626,10 +639,77 @@ export default function AdminEmployeesPage() {
 
               <form onSubmit={handleSaveEmployee} className="p-6 space-y-6">
                 {/* 1. Official & Organization Info */}
-                <div className="space-y-3">
+                <div className="space-y-4">
                   <h4 className="text-xs font-bold text-indigo-700 uppercase tracking-wider flex items-center gap-1.5 pb-2 border-b border-indigo-100">
-                    <Briefcase className="w-4 h-4" /> Organization & Designation Setup
+                    <Briefcase className="w-4 h-4" /> Role, Organization & Designation Setup
                   </h4>
+
+                  {/* Role Selector: Employee vs Administrator */}
+                  <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
+                    <label className="block text-xs font-bold text-slate-800 mb-2 flex items-center justify-between">
+                      <span className="flex items-center gap-1.5">
+                        <Shield className="w-4 h-4 text-rose-700" />
+                        System Role (Admin Access Privilege) <span className="text-rose-500">*</span>
+                      </span>
+                      <span className="text-[11px] text-slate-500 font-normal">
+                        Select whether this user is an Employee or System Administrator
+                      </span>
+                    </label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFormData((prev) => ({
+                            ...prev,
+                            role: "EMPLOYEE",
+                            department: prev.department === "Admin Department" ? (departmentsList.find((d) => d.name !== "Admin Department")?.name || "Robotics Engineering") : prev.department,
+                          }));
+                        }}
+                        className={`flex items-center gap-2.5 p-3 rounded-xl border text-left transition cursor-pointer ${
+                          formData.role !== "ADMIN"
+                            ? "bg-white border-indigo-500 text-indigo-950 shadow-xs ring-2 ring-indigo-500/20"
+                            : "bg-white/60 border-slate-200 text-slate-600 hover:bg-white"
+                        }`}
+                      >
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                          formData.role !== "ADMIN" ? "bg-indigo-100 text-indigo-700 font-bold" : "bg-slate-100 text-slate-400"
+                        }`}>
+                          <User className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <div className="font-bold text-xs">Standard Employee</div>
+                          <div className="text-[10px] text-slate-500">Access Employee Portal, profile, leaves & calendar</div>
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFormData((prev) => ({
+                            ...prev,
+                            role: "ADMIN",
+                            department: "Admin Department",
+                            designation: prev.designation && prev.designation !== "Associate" ? prev.designation : "System Administrator",
+                          }));
+                        }}
+                        className={`flex items-center gap-2.5 p-3 rounded-xl border text-left transition cursor-pointer ${
+                          formData.role === "ADMIN"
+                            ? "bg-rose-50 border-rose-600 text-rose-950 shadow-xs ring-2 ring-rose-500/20"
+                            : "bg-white/60 border-slate-200 text-slate-600 hover:bg-white"
+                        }`}
+                      >
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                          formData.role === "ADMIN" ? "bg-rose-100 text-rose-800 font-bold" : "bg-slate-100 text-slate-400"
+                        }`}>
+                          <ShieldCheck className="w-4 h-4 text-rose-700" />
+                        </div>
+                        <div>
+                          <div className="font-bold text-xs text-rose-900">System Administrator</div>
+                          <div className="text-[10px] text-rose-700">Full Admin Console, add admins/employees & sanctions</div>
+                        </div>
+                      </button>
+                    </div>
+                  </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div>
@@ -655,7 +735,7 @@ export default function AdminEmployeesPage() {
                         name="designation"
                         value={formData.designation}
                         onChange={handleInputChange}
-                        placeholder="e.g. Lead Full Stack Engineer"
+                        placeholder={formData.role === "ADMIN" ? "e.g. System Administrator, Director" : "e.g. Lead Full Stack Engineer"}
                         required
                         className="w-full text-xs font-bold bg-white border border-slate-200 rounded-xl px-3 py-2 text-indigo-900 focus:ring-2 focus:ring-indigo-500"
                       />
@@ -669,16 +749,23 @@ export default function AdminEmployeesPage() {
                       <select
                         name="department"
                         value={formData.department}
-                        onChange={handleInputChange}
-                        className="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2 text-slate-900 focus:ring-2 focus:ring-rose-500"
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setFormData((prev) => ({
+                            ...prev,
+                            department: val,
+                            role: val === "Admin Department" || val === "Administration" ? "ADMIN" : prev.role,
+                          }));
+                        }}
+                        className="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2 text-slate-900 focus:ring-2 focus:ring-rose-500 font-medium"
                       >
-                        {departmentsList.length > 0 ? (
-                          departmentsList.map((d) => (
-                            <option key={d.id} value={d.name}>
-                              {d.name} ({d.code})
-                            </option>
-                          ))
-                        ) : (
+                        <option value="Admin Department">Admin Department (ADM)</option>
+                        {departmentsList.filter((d) => d.name !== "Admin Department" && d.name !== "Administration").map((d) => (
+                          <option key={d.id} value={d.name}>
+                            {d.name} ({d.code})
+                          </option>
+                        ))}
+                        {departmentsList.length === 0 && (
                           <>
                             <option value="Robotics Engineering">Robotics Engineering (ROB-ENG)</option>
                             <option value="Industrial Automation">Industrial Automation (IND-AUTO)</option>
@@ -1089,6 +1176,18 @@ export default function AdminEmployeesPage() {
                   <div>
                     <span className="text-[10px] text-slate-400 font-bold uppercase">Official Email</span>
                     <div className="text-slate-800 truncate">{viewingProfile.email}</div>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-400 font-bold uppercase">Role & Access</span>
+                    <div className="font-bold">
+                      {viewingProfile.role === "ADMIN" ? (
+                        <span className="text-rose-700 flex items-center gap-1 font-bold">
+                          <ShieldCheck className="w-3.5 h-3.5 text-rose-700" /> Administrator
+                        </span>
+                      ) : (
+                        <span className="text-slate-700 font-medium">Standard Employee</span>
+                      )}
+                    </div>
                   </div>
                   <div>
                     <span className="text-[10px] text-slate-400 font-bold uppercase">Personal Email</span>

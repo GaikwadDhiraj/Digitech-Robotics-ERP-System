@@ -51,6 +51,7 @@ const fixedHolidays = [
 
 // Default Departments for the organization
 const defaultDepartments = [
+  { id: "dept-admin", name: "Admin Department", code: "ADM", description: "Executive administration, management, and system governance.", headName: "Dhiraj Gaikwad" },
   { id: "dept-1", name: "Robotics Engineering", code: "ROB-ENG", description: "Design, prototyping, and assembly of robotic systems.", headName: "Dhiraj Gaikwad" },
   { id: "dept-2", name: "Industrial Automation", code: "IND-AUTO", description: "PLC programming, SCADA, and factory automated cells.", headName: "Automation Lead" },
   { id: "dept-3", name: "Software Development", code: "SFT-DEV", description: "Cloud software, ERP, firmware, and AI algorithms.", headName: "Software Lead" },
@@ -741,9 +742,39 @@ export const dataStore = {
   async getDepartments() {
     if (await isPrismaAvailable()) {
       try {
-        return await prisma.department.findMany({
+        let depts = await prisma.department.findMany({
           orderBy: { createdAt: "asc" },
         });
+
+        // Ensure default departments and Admin Department exist in DB
+        if (depts.length === 0) {
+          for (const d of defaultDepartments) {
+            await prisma.department.create({
+              data: {
+                name: d.name,
+                code: d.code,
+                description: d.description,
+                headName: d.headName,
+              },
+            }).catch(() => {});
+          }
+          depts = await prisma.department.findMany({
+            orderBy: { createdAt: "asc" },
+          });
+        } else if (!depts.some((d) => d.code === "ADM" || d.name === "Admin Department" || d.name === "Administration")) {
+          await prisma.department.create({
+            data: {
+              name: "Admin Department",
+              code: "ADM",
+              description: "Executive administration, management, and system governance.",
+              headName: "Dhiraj Gaikwad",
+            },
+          }).catch(() => {});
+          depts = await prisma.department.findMany({
+            orderBy: { createdAt: "asc" },
+          });
+        }
+        return depts;
       } catch (err) {
         console.warn("Prisma fallback for departments:", err.message);
       }

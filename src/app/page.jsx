@@ -100,13 +100,13 @@ export default function HomePage() {
                 Admin Console
               </h2>
               <p className="text-xs text-slate-400 mt-2 leading-relaxed">
-                Reserved exclusively for <strong>dvgaikwad333@gmail.com</strong>. Register new employees with official emails, configure leave policies, and sanction requests.
+                Reserved for <strong>dvgaikwad333@gmail.com</strong> and designated Administrators. Register new employees &amp; admins with official emails, configure leave policies, and sanction requests.
               </p>
 
               <ul className="mt-4 space-y-2 text-xs text-slate-300">
                 <li className="flex items-center gap-2">
                   <CheckCircle2 className="w-3.5 h-3.5 text-rose-500" />
-                  <span>Add Employees with Official Email &amp; KYC</span>
+                  <span>Add Employees &amp; Admins with Official Email &amp; KYC</span>
                 </li>
                 <li className="flex items-center gap-2">
                   <CheckCircle2 className="w-3.5 h-3.5 text-rose-500" />
