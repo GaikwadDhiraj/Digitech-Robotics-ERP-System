@@ -5,6 +5,7 @@ import DashboardShell from "@/components/DashboardShell";
 import ProfilePhotoModal from "@/components/ProfilePhotoModal";
 import { useAuth } from "@/context/AuthContext";
 import {
+  User,
   UserCircle,
   Mail,
   Phone,
@@ -302,8 +303,8 @@ export default function EmployeeProfilePage() {
                     className="w-full h-full object-cover rounded-full transition group-hover:scale-105"
                   />
                 ) : (
-                  <div className="w-full h-full rounded-full flex items-center justify-center font-black text-3xl text-rose-900 bg-rose-50">
-                    {currentUser?.name?.substring(0, 2).toUpperCase() || "EP"}
+                  <div className="w-full h-full rounded-full flex items-center justify-center bg-slate-100 text-slate-400">
+                    <User className="w-16 h-16 text-slate-400" />
                   </div>
                 )}
 

@@ -97,8 +97,8 @@ export default function Header() {
                 className="w-full h-full object-cover"
               />
             ) : (
-              <div className="w-full h-full flex items-center justify-center font-bold text-xs text-rose-900 bg-rose-100">
-                {currentUser?.name?.substring(0, 2).toUpperCase() || "US"}
+              <div className="w-full h-full flex items-center justify-center text-slate-600 bg-slate-100">
+                <User className="w-4 h-4 text-slate-600" />
               </div>
             )}
             <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white">

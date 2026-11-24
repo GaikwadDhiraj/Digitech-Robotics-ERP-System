@@ -767,12 +767,12 @@ export default function AdminLeaveSanctionsPage() {
                         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                           {/* Left: Employee Info */}
                           <div className="flex items-start gap-4">
-                            <div className="w-12 h-12 rounded-2xl overflow-hidden bg-slate-100 ring-2 ring-indigo-500/10 shrink-0">
+                            <div className="w-12 h-12 rounded-full overflow-hidden bg-slate-100 ring-2 ring-indigo-500/10 shrink-0 flex items-center justify-center">
                               {leave.user?.avatarUrl ? (
                                 <img src={leave.user.avatarUrl} alt={leave.user.name} className="w-full h-full object-cover" />
                               ) : (
-                                <div className="w-full h-full flex items-center justify-center font-bold text-indigo-700 bg-indigo-50">
-                                  {leave.user?.name?.substring(0, 2).toUpperCase() || "EM"}
+                                <div className="w-full h-full flex items-center justify-center text-slate-500 bg-slate-100">
+                                  <User className="w-6 h-6 text-slate-500" />
                                 </div>
                               )}
                             </div>

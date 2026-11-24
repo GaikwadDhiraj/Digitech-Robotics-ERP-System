@@ -254,7 +254,7 @@ export const dataStore = {
       bankDocUrl: data.bankDocUrl || null,
       bankDocName: data.bankDocName || null,
       emergencyContact: data.emergencyContact || "",
-      avatarUrl: data.avatarUrl || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80",
+      avatarUrl: data.avatarUrl || null,
       bio: data.bio || "",
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),

@@ -5,6 +5,7 @@ import DashboardShell from "@/components/DashboardShell";
 import Pagination from "@/components/Pagination";
 import { useAuth } from "@/context/AuthContext";
 import {
+  User,
   Users,
   UserPlus,
   Search,
@@ -19,6 +20,7 @@ import {
   Trash2,
   X,
   Shield,
+  ShieldCheck,
   IndianRupee,
   Calendar,
   Sparkles,
@@ -490,12 +492,12 @@ export default function AdminEmployeesPage() {
                         {/* Name & Avatar */}
                         <td className="py-4 px-6">
                           <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl overflow-hidden bg-slate-100 ring-2 ring-indigo-500/10 shrink-0">
+                            <div className="w-10 h-10 rounded-full overflow-hidden bg-slate-100 ring-2 ring-indigo-500/10 shrink-0 flex items-center justify-center">
                               {emp.avatarUrl ? (
                                 <img src={emp.avatarUrl} alt={emp.name} className="w-full h-full object-cover" />
                               ) : (
-                                <div className="w-full h-full flex items-center justify-center font-bold text-indigo-700 bg-indigo-50">
-                                  {emp.name.substring(0, 2).toUpperCase()}
+                                <div className="w-full h-full flex items-center justify-center text-slate-500 bg-slate-100">
+                                  <User className="w-5 h-5 text-slate-500" />
                                 </div>
                               )}
                             </div>
@@ -1130,12 +1132,12 @@ export default function AdminEmployeesPage() {
             <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
               <div className="p-6 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white/95 backdrop-blur-md z-10">
                 <div className="flex items-center gap-3">
-                  <div className="w-14 h-14 rounded-full overflow-hidden bg-slate-100 ring-2 ring-indigo-500/20 shrink-0 shadow-xs">
+                  <div className="w-14 h-14 rounded-full overflow-hidden bg-slate-100 ring-2 ring-indigo-500/20 shrink-0 shadow-xs flex items-center justify-center">
                     {viewingProfile.avatarUrl ? (
                       <img src={viewingProfile.avatarUrl} alt={viewingProfile.name} className="w-full h-full object-cover" />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center font-bold text-lg text-indigo-700 bg-indigo-50">
-                        {viewingProfile.name.substring(0, 2).toUpperCase()}
+                      <div className="w-full h-full flex items-center justify-center text-slate-500 bg-slate-100">
+                        <User className="w-7 h-7 text-slate-500" />
                       </div>
                     )}
                   </div>
