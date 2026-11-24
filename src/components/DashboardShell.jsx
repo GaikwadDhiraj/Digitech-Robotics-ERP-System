@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import Header from "./Header";
 import Sidebar from "./Sidebar";
 import AccessDenied from "./AccessDenied";
@@ -11,6 +11,7 @@ import { Loader2 } from "lucide-react";
 export default function DashboardShell({ children }) {
   const { isLoading, isAuthorized, authError, isRealAdmin } = useAuth();
   const pathname = usePathname();
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
 
   if (isLoading) {
     return (
@@ -37,11 +38,14 @@ export default function DashboardShell({ children }) {
 
   return (
     <div className="h-screen flex flex-col bg-slate-50 text-slate-900 font-sans antialiased overflow-hidden">
-      <Header />
-      <div className="flex-1 flex overflow-hidden">
-        <Sidebar />
-        <main className="flex-1 h-full overflow-y-auto p-6 lg:p-8">
-          <div className="max-w-7xl mx-auto w-full">
+      <Header onToggleMobileMenu={() => setIsMobileNavOpen((prev) => !prev)} />
+      <div className="flex-1 flex overflow-hidden relative">
+        <Sidebar
+          isMobileOpen={isMobileNavOpen}
+          onCloseMobile={() => setIsMobileNavOpen(false)}
+        />
+        <main className="flex-1 h-full overflow-y-auto p-3.5 sm:p-5 md:p-6 lg:p-8">
+          <div className="max-w-7xl mx-auto w-full pb-10">
             {children}
           </div>
         </main>

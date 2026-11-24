@@ -544,10 +544,10 @@ export default function AdminLeaveSanctionsPage() {
         )}
 
         {/* Top View Selector Tabs: Leave Requests vs Comp Off Claims vs Annual Policies */}
-        <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
+        <div className="flex items-center gap-2 border-b border-slate-200 pb-2 overflow-x-auto">
           <button
             onClick={() => setActiveTab("requests")}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer ${
               activeTab === "requests"
                 ? "bg-rose-900 text-white shadow-xs"
                 : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
@@ -559,7 +559,7 @@ export default function AdminLeaveSanctionsPage() {
 
           <button
             onClick={() => setActiveTab("compoff")}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer ${
               activeTab === "compoff"
                 ? "bg-rose-900 text-white shadow-xs"
                 : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
@@ -571,7 +571,7 @@ export default function AdminLeaveSanctionsPage() {
 
           <button
             onClick={() => setActiveTab("policies")}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer ${
               activeTab === "policies"
                 ? "bg-rose-900 text-white shadow-xs"
                 : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
@@ -583,7 +583,7 @@ export default function AdminLeaveSanctionsPage() {
 
           <button
             onClick={() => setActiveTab("calendar")}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer ${
               activeTab === "calendar"
                 ? "bg-rose-900 text-white shadow-xs"
                 : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
@@ -1352,19 +1352,21 @@ export default function AdminLeaveSanctionsPage() {
                 </div>
               </div>
 
-              {/* Day of Week Header */}
-              <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-100 text-center text-xs font-black text-slate-600 py-3">
-                <span className="text-rose-700">SUN (Weekly Off)</span>
-                <span>MON</span>
-                <span>TUE</span>
-                <span>WED</span>
-                <span>THU</span>
-                <span>FRI</span>
-                <span className="text-indigo-700">SAT</span>
-              </div>
+              {/* Day of Week Header & Calendar Grid with Responsive Horizontal Scroll */}
+              <div className="overflow-x-auto">
+                <div className="min-w-[680px] md:min-w-0">
+                  <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-100 text-center text-xs font-black text-slate-600 py-3">
+                    <span className="text-rose-700">SUN (Weekly Off)</span>
+                    <span>MON</span>
+                    <span>TUE</span>
+                    <span>WED</span>
+                    <span>THU</span>
+                    <span>FRI</span>
+                    <span className="text-indigo-700">SAT</span>
+                  </div>
 
-              {/* Calendar Grid of Month Days */}
-              <div className="grid grid-cols-7 divide-x divide-y divide-slate-100 bg-slate-50/30">
+                  {/* Calendar Grid of Month Days */}
+                  <div className="grid grid-cols-7 divide-x divide-y divide-slate-100 bg-slate-50/30">
                 {(() => {
                   const firstDayIndex = new Date(calendarYear, calendarMonth, 1).getDay();
                   const daysInMonth = new Date(calendarYear, calendarMonth + 1, 0).getDate();
@@ -1526,6 +1528,8 @@ export default function AdminLeaveSanctionsPage() {
 
                   return cells;
                 })()}
+                  </div>
+                </div>
               </div>
 
               {/* Roster Legend */}
