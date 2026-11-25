@@ -11,20 +11,14 @@ import {
   CheckCircle2,
   LogIn,
   ArrowRight,
-  ChevronDown,
-  ChevronRight,
-  ChevronLeft,
   Sparkles,
   ExternalLink,
-  Layers,
-  CalendarCheck,
-  Building2,
   Menu,
   X,
 } from "lucide-react";
 
 export default function HomePage() {
-  const { isRealAdmin, isAuthorized, authError, currentUser, isClerkSignedIn } = useAuth();
+  const { isRealAdmin, currentUser } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
@@ -37,7 +31,7 @@ export default function HomePage() {
       <div className="absolute top-60 right-1/4 w-96 h-96 bg-amber-50/40 rounded-full blur-3xl pointer-events-none -z-10" />
 
       {/* =========================================================================
-          Signature Crimson Pill Navbar (Exact replica of digitecrobotics.com)
+          Signature Crimson Pill Navbar (Streamlined specifically for ERP Portal)
          ========================================================================= */}
       <div className="w-full max-w-6xl mx-auto pt-4 sm:pt-6 px-3 sm:px-6 relative z-30">
         <header className="bg-[#7a1228] text-white rounded-full px-4 sm:px-6 py-2.5 sm:py-3 flex items-center justify-between shadow-xl shadow-rose-950/20 border border-rose-900/40 backdrop-blur-md">
@@ -55,40 +49,12 @@ export default function HomePage() {
                 DigiTech Robotics
               </span>
               <span className="text-[9px] sm:text-[10px] text-rose-200 font-medium tracking-wide">
-                India Pvt. Ltd.
+                India Pvt. Ltd. &bull; ERP Suite
               </span>
             </div>
           </Link>
 
-          {/* Center: Desktop Navigation Links matching website */}
-          <nav className="hidden lg:flex items-center gap-6 xl:gap-8 text-xs font-semibold tracking-wide text-white/90">
-            <Link
-              href="/"
-              className="text-white hover:text-rose-200 transition py-1 border-b-2 border-white font-bold"
-            >
-              Home
-            </Link>
-            <div className="relative group cursor-pointer flex items-center gap-1 hover:text-rose-200 transition">
-              <span>Products</span>
-              <ChevronDown className="w-3 h-3 text-rose-300" />
-            </div>
-            <div className="relative group cursor-pointer flex items-center gap-1 hover:text-rose-200 transition">
-              <span>Trainings</span>
-              <ChevronDown className="w-3 h-3 text-rose-300" />
-            </div>
-            <div className="relative group cursor-pointer flex items-center gap-1 hover:text-rose-200 transition">
-              <span>Our Work</span>
-              <ChevronDown className="w-3 h-3 text-rose-300" />
-            </div>
-            <Link
-              href="#about"
-              className="hover:text-rose-200 transition py-1"
-            >
-              About
-            </Link>
-          </nav>
-
-          {/* Right: White Action Pill Button / Auth */}
+          {/* Right: Auth Action / Portal Shortcut */}
           <div className="flex items-center gap-2 sm:gap-3">
             <Show when="signed-in">
               <div className="flex items-center gap-2 bg-white/10 hover:bg-white/20 border border-white/20 rounded-full px-3 py-1.5 transition">
@@ -97,6 +63,13 @@ export default function HomePage() {
                 </span>
                 <UserButton />
               </div>
+              <Link
+                href={isRealAdmin ? "/admin" : "/employee"}
+                className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white text-[#7a1228] font-bold text-xs hover:bg-rose-50 transition shadow-md shadow-black/10"
+              >
+                <span>Dashboard</span>
+                <ArrowRight className="w-3 h-3" />
+              </Link>
             </Show>
 
             <Show when="signed-out">
@@ -108,68 +81,43 @@ export default function HomePage() {
               </SignInButton>
             </Show>
 
-            {/* Mobile menu hamburger toggle */}
-            <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="lg:hidden p-1.5 rounded-full hover:bg-white/10 text-white transition cursor-pointer"
-              aria-label="Toggle menu"
-            >
-              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-            </button>
+            {/* Mobile menu trigger */}
+            <Show when="signed-in">
+              <button
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                className="sm:hidden p-1.5 rounded-full hover:bg-white/10 text-white transition cursor-pointer"
+                aria-label="Toggle menu"
+              >
+                {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+              </button>
+            </Show>
           </div>
         </header>
 
-        {/* Mobile Dropdown Menu */}
+        {/* Mobile Dropdown for Signed In Shortcuts */}
         {mobileMenuOpen && (
-          <div className="lg:hidden mt-2 bg-[#7a1228] border border-rose-900 rounded-3xl p-4 text-white shadow-2xl flex flex-col space-y-3 animate-in fade-in slide-in-from-top-2 duration-200">
-            <Link
-              href="/"
-              onClick={() => setMobileMenuOpen(false)}
-              className="px-3 py-2 rounded-xl bg-white/10 font-bold text-xs"
-            >
-              Home
-            </Link>
-            <div className="px-3 py-1.5 text-xs text-rose-200 font-medium">Products &amp; Industrial Solutions</div>
-            <div className="px-3 py-1.5 text-xs text-rose-200 font-medium">Robotics Trainings &amp; AI/ML</div>
-            <div className="px-3 py-1.5 text-xs text-rose-200 font-medium">Enterprise ERP &amp; Workforce</div>
-            <div className="pt-2 border-t border-rose-900/60 flex items-center justify-between text-xs">
-              <span className="text-rose-200">Authorized Access Only</span>
-              <Show when="signed-in">
-                <Link
-                  href={isRealAdmin ? "/admin" : "/employee"}
-                  className="px-3 py-1.5 rounded-full bg-white text-[#7a1228] font-bold text-xs"
-                >
-                  Go to Dashboard →
-                </Link>
-              </Show>
+          <div className="sm:hidden mt-2 bg-[#7a1228] border border-rose-900 rounded-3xl p-4 text-white shadow-2xl flex flex-col space-y-3 animate-in fade-in slide-in-from-top-2 duration-200">
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-rose-200">Logged in as {currentUser?.name || "User"}</span>
+              <Link
+                href={isRealAdmin ? "/admin" : "/employee"}
+                onClick={() => setMobileMenuOpen(false)}
+                className="px-3.5 py-1.5 rounded-full bg-white text-[#7a1228] font-bold text-xs"
+              >
+                Go to Dashboard &rarr;
+              </Link>
             </div>
           </div>
         )}
       </div>
 
       {/* =========================================================================
-          Hero Section with Wireframe Curved Lines (Exact replica of official site)
+          Hero Section with Wireframe Curved Lines
          ========================================================================= */}
-      <main className="flex-1 flex flex-col items-center justify-start pt-8 sm:pt-14 md:pt-18 pb-16 px-4 sm:px-6 relative z-10 max-w-7xl mx-auto w-full">
-        {/* Carousel Side Arrows (decorative UI matching screenshot) */}
-        <button
-          type="button"
-          className="hidden xl:flex absolute left-4 top-48 w-10 h-10 rounded-full border border-slate-300 bg-white/80 backdrop-blur-xs text-slate-700 items-center justify-center hover:bg-white hover:border-[#7a1228] hover:text-[#7a1228] transition shadow-xs cursor-pointer"
-          aria-label="Previous slide"
-        >
-          <ChevronLeft className="w-5 h-5" />
-        </button>
-        <button
-          type="button"
-          className="hidden xl:flex absolute right-4 top-48 w-10 h-10 rounded-full border border-slate-300 bg-white/80 backdrop-blur-xs text-slate-700 items-center justify-center hover:bg-white hover:border-[#7a1228] hover:text-[#7a1228] transition shadow-xs cursor-pointer"
-          aria-label="Next slide"
-        >
-          <ChevronRight className="w-5 h-5" />
-        </button>
-
-        {/* Small top badge */}
-        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-rose-50 border border-rose-200 text-[#7a1228] text-xs font-bold mb-4 shadow-xs">
-          <Sparkles className="w-3.5 h-3.5 text-[#7a1228]" />
+      <main className="flex-1 flex flex-col items-center justify-start pt-6 sm:pt-10 md:pt-14 pb-16 px-4 sm:px-6 relative z-10 max-w-7xl mx-auto w-full">
+        {/* Subtle, reduced-size ERP Suite indicator badge */}
+        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-50/90 border border-rose-200/90 text-[#7a1228] text-[10px] sm:text-[11px] font-semibold mb-3 shadow-2xs">
+          <Sparkles className="w-3 h-3 text-[#7a1228]" />
           <span>Enterprise Resource Planning &amp; Workforce Suite</span>
         </div>
 
@@ -179,43 +127,19 @@ export default function HomePage() {
         </h1>
 
         {/* Official Tagline Subtitle */}
-        <p className="mt-4 sm:mt-5 text-sm sm:text-base md:text-lg text-slate-600 max-w-3xl text-center leading-relaxed font-normal">
+        <p className="mt-3 sm:mt-4 text-xs sm:text-sm md:text-base text-slate-600 max-w-2xl text-center leading-relaxed font-normal">
           Developing intelligent platforms for industrial automation, hands-on robotics training, AI/ML, and the factories of tomorrow.
         </p>
-
-        {/* Primary Action Button (Discover Excellence →) */}
-        <div className="mt-6 sm:mt-8 flex flex-col sm:flex-row items-center gap-3">
-          <a
-            href="#portals"
-            className="px-8 py-3.5 rounded-full bg-[#7a1228] hover:bg-[#600e1f] text-white font-bold text-sm sm:text-base flex items-center gap-2.5 transition shadow-lg shadow-rose-950/30 transform hover:-translate-y-0.5 cursor-pointer"
-          >
-            <span>Discover Excellence</span>
-            <ArrowRight className="w-4 h-4" />
-          </a>
-        </div>
-
-        {/* Infinite Paths / Carousel Indicator Indicator matching screenshot */}
-        <div className="mt-6 flex flex-col items-center gap-2">
-          <div className="flex items-center gap-2 text-[11px] font-bold tracking-widest text-[#7a1228] uppercase">
-            <span className="w-8 h-0.5 bg-[#7a1228] rounded-full inline-block" />
-            <span>Infinite Paths</span>
-            <span className="w-1.5 h-1.5 rounded-full bg-[#7a1228] inline-block" />
-            <span className="w-1.5 h-1.5 rounded-full bg-slate-300 inline-block" />
-            <span className="w-1.5 h-1.5 rounded-full bg-slate-300 inline-block" />
-            <span className="w-1.5 h-1.5 rounded-full bg-slate-300 inline-block" />
-          </div>
-          <ChevronDown className="w-4 h-4 text-slate-400 animate-bounce mt-1" />
-        </div>
 
         {/* =========================================================================
             Interactive Portal Cards (Clean White Glassmorphism)
            ========================================================================= */}
-        <div id="portals" className="mt-12 sm:mt-16 w-full max-w-4xl scroll-mt-20">
-          <div className="text-center mb-8">
-            <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+        <div id="portals" className="mt-8 sm:mt-12 w-full max-w-4xl">
+          <div className="text-center mb-6">
+            <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight">
               Enterprise Portals &amp; Operations
             </h2>
-            <p className="text-xs sm:text-sm text-slate-500 mt-1 max-w-lg mx-auto">
+            <p className="text-xs text-slate-500 mt-1 max-w-lg mx-auto">
               Secure, role-based gateway for Digitech Robotics personnel and administrators.
             </p>
           </div>
@@ -317,17 +241,16 @@ export default function HomePage() {
       </main>
 
       {/* =========================================================================
-          Clean White Footer matching official site branding
+          Clean White Footer
          ========================================================================= */}
-      <footer id="about" className="border-t border-slate-200 bg-slate-50/70 py-8 px-4 relative z-10 text-center">
+      <footer className="border-t border-slate-200 bg-slate-50/70 py-6 px-4 relative z-10 text-center">
         <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
           <div className="flex items-center gap-2">
             <span className="font-bold text-slate-800">Digitech Robotics India Pvt. Ltd.</span>
             <span>&bull; All Rights Reserved</span>
           </div>
           <div className="flex items-center gap-6 text-[11px] font-medium text-slate-600">
-            <span>Physical AI &amp; Automation</span>
-            <span>Workforce Management</span>
+            <span>Enterprise Resource Planning</span>
             <span>Secured with Clerk &amp; Neon DB</span>
           </div>
         </div>
