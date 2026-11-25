@@ -119,6 +119,7 @@ export async function POST(request) {
             department: user.department || "Admin Department",
             clerkId: clerkId || user.clerkId,
             avatarUrl: avatarUrl || user.avatarUrl,
+            status: "ACTIVE",
           },
           include: { leaveBalances: true },
         });
@@ -134,14 +135,14 @@ export async function POST(request) {
 
     // 2. Existing user in DB (pre-registered by Admin as ADMIN or EMPLOYEE)
     if (user) {
-      // Check if deactivated
+      // Check if inactive / unauthorized
       if (user.status === "INACTIVE") {
         return NextResponse.json(
           {
             success: false,
             isAuthorized: false,
             error: "ACCOUNT_INACTIVE",
-            message: "Your account is currently deactivated. Please contact your Administrator.",
+            message: "Access Restricted: Your email is not active or authorized in the Digitech Robotics ERP system. Please contact the Administrator to verify your official access.",
           },
           { status: 403 }
         );
@@ -167,37 +168,40 @@ export async function POST(request) {
       });
     }
 
-    // 3. User does NOT exist in DB yet -> COMPULSORY SAVE TO DATABASE
-    // "who ever try to login or signing the user login data should be goes to the database in the user table complusary"
+    // 3. User does NOT exist in DB yet (unauthorized email)
+    // Per requirement: record login attempt in database with INACTIVE status, but do NOT grant access
     const userCount = await prisma.user.count().catch(() => 0);
     const joinYear = (new Date().getFullYear() % 100).toString().padStart(2, "0");
     const generatedId = `DG-${joinYear}-${String(userCount + 1).padStart(4, "0")}`;
 
-    user = await prisma.user.create({
+    await prisma.user.create({
       data: {
         employeeId: generatedId,
         clerkId,
         name,
         email: normalizedEmail,
         personalEmail: normalizedEmail,
-        department: "Robotics Engineering",
-        designation: "Associate",
+        department: "Unassigned",
+        designation: "Unregistered Sign-in",
         role: "EMPLOYEE",
-        status: "ACTIVE",
+        status: "INACTIVE", // Inactive by default so unauthorized users are blocked!
         avatarUrl,
         salary: 0,
         joinDate: new Date(),
       },
-      include: { leaveBalances: true },
+    }).catch((e) => {
+      console.warn("Could not record unauthorized sign-in attempt:", e.message);
     });
 
-    await ensureLeaveBalances(user.id);
-
-    return NextResponse.json({
-      success: true,
-      isAuthorized: true,
-      user,
-    });
+    return NextResponse.json(
+      {
+        success: false,
+        isAuthorized: false,
+        error: "NOT_PRE_REGISTERED",
+        message: "Access Restricted: Your email is not registered in the Digitech Robotics ERP system. Only employees and administrators pre-registered by the Administrator can access the portal.",
+      },
+      { status: 403 }
+    );
   } catch (error) {
     console.error("Auth sync error:", error);
     return NextResponse.json(
@@ -268,6 +272,7 @@ export async function GET() {
             role: "ADMIN",
             clerkId: clerkId || user.clerkId,
             avatarUrl: avatarUrl || user.avatarUrl,
+            status: "ACTIVE",
           },
           include: { leaveBalances: true },
         });
@@ -283,7 +288,7 @@ export async function GET() {
             success: false,
             isAuthorized: false,
             error: "ACCOUNT_INACTIVE",
-            message: "Your account is currently deactivated. Please contact your Administrator.",
+            message: "Access Restricted: Your email is not active or authorized in the Digitech Robotics ERP system. Please contact the Administrator to verify your official access.",
           },
           { status: 403 }
         );
@@ -302,31 +307,39 @@ export async function GET() {
       return NextResponse.json({ success: true, isAuthorized: true, user });
     }
 
-    // Compulsory create in database
+    // Unregistered email -> record in DB as INACTIVE, but deny access
     const userCount = await prisma.user.count().catch(() => 0);
     const joinYear = (new Date().getFullYear() % 100).toString().padStart(2, "0");
     const generatedId = `DG-${joinYear}-${String(userCount + 1).padStart(4, "0")}`;
 
-    user = await prisma.user.create({
+    await prisma.user.create({
       data: {
         employeeId: generatedId,
         clerkId,
         name,
         email: normalizedEmail,
         personalEmail: normalizedEmail,
-        department: "Robotics Engineering",
-        designation: "Associate",
+        department: "Unassigned",
+        designation: "Unregistered Sign-in",
         role: "EMPLOYEE",
-        status: "ACTIVE",
+        status: "INACTIVE",
         avatarUrl,
         salary: 0,
         joinDate: new Date(),
       },
-      include: { leaveBalances: true },
+    }).catch((e) => {
+      console.warn("Could not record unauthorized sign-in attempt:", e.message);
     });
 
-    await ensureLeaveBalances(user.id);
-    return NextResponse.json({ success: true, isAuthorized: true, user });
+    return NextResponse.json(
+      {
+        success: false,
+        isAuthorized: false,
+        error: "NOT_PRE_REGISTERED",
+        message: "Access Restricted: Your email is not registered in the Digitech Robotics ERP system. Only employees and administrators pre-registered by the Administrator can access the portal.",
+      },
+      { status: 403 }
+    );
   } catch (error) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }

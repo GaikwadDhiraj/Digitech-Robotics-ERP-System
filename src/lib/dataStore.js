@@ -349,6 +349,21 @@ export const dataStore = {
   },
 
   async toggleEmployeeStatus(id) {
+    if (await isPrismaAvailable()) {
+      try {
+        const u = await prisma.user.findUnique({ where: { id } });
+        if (u) {
+          const newStatus = u.status === "ACTIVE" ? "INACTIVE" : "ACTIVE";
+          const updated = await prisma.user.update({
+            where: { id },
+            data: { status: newStatus },
+          });
+          return updated;
+        }
+      } catch (err) {
+        console.warn("Prisma toggleEmployeeStatus fallback:", err.message);
+      }
+    }
     const index = globalMemory.__ERP_EMPLOYEES__.findIndex((e) => e.id === id);
     if (index === -1) return null;
     const current = globalMemory.__ERP_EMPLOYEES__[index].status;
