@@ -167,7 +167,7 @@ export default function EmployeeCalendarPage() {
       const [leavesRes, balancesRes, holidaysRes, compOffsRes, settingsRes] = await Promise.all([
         fetch(`/api/leaves?userId=${currentUser.id}`),
         fetch(`/api/leave-balances?userId=${currentUser.id}&year=${selectedYear}`),
-        fetch("/api/holidays"),
+        fetch(`/api/holidays?year=${selectedYear}`),
         fetch(`/api/comp-offs?userId=${currentUser.id}`),
         fetch("/api/calendar-settings"),
       ]);
@@ -1048,7 +1048,7 @@ export default function EmployeeCalendarPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
             {balances.map((b) => {
               const pct = b.allocatedDays > 0 ? (b.remainingDays / b.allocatedDays) * 100 : 0;
               return (

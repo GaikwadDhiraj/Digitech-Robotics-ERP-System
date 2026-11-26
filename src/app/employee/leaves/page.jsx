@@ -272,7 +272,7 @@ export default function EmployeeLeavePage() {
             <span className="text-[11px] font-medium text-slate-400">Assigned automatically by Admin</span>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
             {balances.map((bal) => {
               const percentRemaining = bal.allocatedDays > 0 ? (bal.remainingDays / bal.allocatedDays) * 100 : 0;
               return (

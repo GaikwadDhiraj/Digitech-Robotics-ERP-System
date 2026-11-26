@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import { dataStore } from "@/lib/dataStore";
 
-export async function GET() {
+export async function GET(request) {
   try {
-    const holidays = await dataStore.getHolidays();
+    const { searchParams } = new URL(request.url);
+    const year = searchParams.get("year");
+    const holidays = await dataStore.getHolidays(year ? parseInt(year, 10) : undefined);
     return NextResponse.json({ success: true, data: holidays });
   } catch (error) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });

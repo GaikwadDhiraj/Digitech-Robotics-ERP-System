@@ -1,4 +1,4 @@
-import { prisma } from "./prisma";
+import { prisma } from "./prisma.js";
 
 // Default leave policies for the year (1 Jan - 31 Dec)
 const defaultLeavePolicies = [
@@ -34,20 +34,99 @@ const defaultLeavePolicies = [
     description: "Immediate leave for unforeseen personal or family emergencies.",
     color: "amber",
   },
+  {
+    id: "policy-comp",
+    name: "Compensatory Off",
+    code: "CO",
+    defaultDaysPerYear: 0,
+    description: "Earned complementary leave for approved weekend/holiday duty (+1 per approved comp off claim).",
+    color: "teal",
+  },
 ];
 
-// Fixed Holidays for the year 2026
-const fixedHolidays = [
-  { id: "h-1", name: "New Year's Day", date: "2026-01-01", type: "NATIONAL" },
-  { id: "h-2", name: "Republic Day", date: "2026-01-26", type: "NATIONAL" },
-  { id: "h-3", name: "Holi", date: "2026-03-04", type: "FESTIVAL" },
-  { id: "h-4", name: "Good Friday", date: "2026-04-03", type: "FESTIVAL" },
-  { id: "h-5", name: "Labor Day / May Day", date: "2026-05-01", type: "NATIONAL" },
-  { id: "h-6", name: "Independence Day", date: "2026-08-15", type: "NATIONAL" },
-  { id: "h-7", name: "Gandhi Jayanti", date: "2026-10-02", type: "NATIONAL" },
-  { id: "h-8", name: "Diwali", date: "2026-11-08", type: "FESTIVAL" },
-  { id: "h-9", name: "Christmas Day", date: "2026-12-25", type: "FESTIVAL" },
-];
+// Comprehensive Indian National & Gazetted Public Holidays calendar generator
+function getStandardNationalHolidays(year = 2026) {
+  const y = parseInt(year, 10) || 2026;
+
+  // Fixed Date National & Gazetted Public Holidays (same date every year across the calendar)
+  const fixed = [
+    { name: "New Year's Day", date: `${y}-01-01`, type: "NATIONAL" },
+    { name: "Makar Sankranti / Pongal", date: `${y}-01-14`, type: "FESTIVAL" },
+    { name: "Republic Day", date: `${y}-01-26`, type: "NATIONAL" },
+    { name: "Chhatrapati Shivaji Maharaj Jayanti", date: `${y}-02-19`, type: "FESTIVAL" },
+    { name: "Dr. B.R. Ambedkar Jayanti", date: `${y}-04-14`, type: "NATIONAL" },
+    { name: "Maharashtra Day / Labour Day", date: `${y}-05-01`, type: "NATIONAL" },
+    { name: "Independence Day", date: `${y}-08-15`, type: "NATIONAL" },
+    { name: "Mahatma Gandhi Jayanti", date: `${y}-10-02`, type: "NATIONAL" },
+    { name: "Christmas Day", date: `${y}-12-25`, type: "NATIONAL" },
+  ];
+
+  // Lunar / Gazetted festivals specific to each calendar year
+  const yearSpecific = {
+    2025: [
+      { name: "Maha Shivratri", date: "2025-02-26", type: "FESTIVAL" },
+      { name: "Holi / Dhulivandan", date: "2025-03-14", type: "FESTIVAL" },
+      { name: "Gudi Padwa", date: "2025-03-30", type: "FESTIVAL" },
+      { name: "Eid-ul-Fitr (Ramzan Eid)", date: "2025-03-31", type: "FESTIVAL" },
+      { name: "Good Friday", date: "2025-04-18", type: "FESTIVAL" },
+      { name: "Buddha Purnima", date: "2025-05-12", type: "FESTIVAL" },
+      { name: "Eid-ul-Adha (Bakrid)", date: "2025-06-07", type: "FESTIVAL" },
+      { name: "Ganesh Chaturthi", date: "2025-08-27", type: "FESTIVAL" },
+      { name: "Dussehra (Vijayadashami)", date: "2025-10-02", type: "FESTIVAL" },
+      { name: "Diwali (Laxmi Pujan)", date: "2025-10-20", type: "FESTIVAL" },
+      { name: "Govardhan Puja / Balipratipada", date: "2025-10-22", type: "FESTIVAL" },
+      { name: "Bhai Dooj", date: "2025-10-23", type: "FESTIVAL" },
+      { name: "Guru Nanak Jayanti", date: "2025-11-05", type: "FESTIVAL" },
+    ],
+    2026: [
+      { name: "Maha Shivratri", date: "2026-02-15", type: "FESTIVAL" },
+      { name: "Holi / Dhulivandan", date: "2026-03-04", type: "FESTIVAL" },
+      { name: "Gudi Padwa / Ugadi", date: "2026-03-19", type: "FESTIVAL" },
+      { name: "Eid-ul-Fitr (Ramzan Eid)", date: "2026-03-21", type: "FESTIVAL" },
+      { name: "Good Friday", date: "2026-04-03", type: "FESTIVAL" },
+      { name: "Mahavir Jayanti", date: "2026-04-01", type: "FESTIVAL" },
+      { name: "Buddha Purnima", date: "2026-05-31", type: "FESTIVAL" },
+      { name: "Eid-ul-Adha (Bakrid)", date: "2026-05-27", type: "FESTIVAL" },
+      { name: "Muharram", date: "2026-06-26", type: "FESTIVAL" },
+      { name: "Raksha Bandhan", date: "2026-08-28", type: "FESTIVAL" },
+      { name: "Janmashtami", date: "2026-09-04", type: "FESTIVAL" },
+      { name: "Ganesh Chaturthi", date: "2026-09-14", type: "FESTIVAL" },
+      { name: "Eid-e-Milad", date: "2026-08-26", type: "FESTIVAL" },
+      { name: "Dussehra (Vijayadashami)", date: "2026-10-20", type: "FESTIVAL" },
+      { name: "Diwali (Laxmi Pujan)", date: "2026-11-08", type: "FESTIVAL" },
+      { name: "Govardhan Puja / Balipratipada", date: "2026-11-10", type: "FESTIVAL" },
+      { name: "Bhai Dooj", date: "2026-11-11", type: "FESTIVAL" },
+      { name: "Guru Nanak Jayanti", date: "2026-11-24", type: "FESTIVAL" },
+    ],
+    2027: [
+      { name: "Maha Shivratri", date: "2027-03-07", type: "FESTIVAL" },
+      { name: "Holi / Dhulivandan", date: "2027-03-23", type: "FESTIVAL" },
+      { name: "Good Friday", date: "2027-03-26", type: "FESTIVAL" },
+      { name: "Gudi Padwa", date: "2027-04-07", type: "FESTIVAL" },
+      { name: "Eid-ul-Fitr (Ramzan Eid)", date: "2027-04-09", type: "FESTIVAL" },
+      { name: "Buddha Purnima", date: "2027-05-20", type: "FESTIVAL" },
+      { name: "Eid-ul-Adha (Bakrid)", date: "2027-05-17", type: "FESTIVAL" },
+      { name: "Ganesh Chaturthi", date: "2027-09-04", type: "FESTIVAL" },
+      { name: "Dussehra (Vijayadashami)", date: "2027-10-10", type: "FESTIVAL" },
+      { name: "Diwali (Laxmi Pujan)", date: "2027-10-29", type: "FESTIVAL" },
+      { name: "Govardhan Puja / Balipratipada", date: "2027-10-31", type: "FESTIVAL" },
+      { name: "Bhai Dooj", date: "2027-11-01", type: "FESTIVAL" },
+      { name: "Guru Nanak Jayanti", date: "2027-11-14", type: "FESTIVAL" },
+    ],
+  };
+
+  const festivals = yearSpecific[y] || [];
+  return [...fixed, ...festivals].map((h, i) => ({
+    id: `nat-${y}-${i}-${h.date}`,
+    name: h.name,
+    date: h.date,
+    type: h.type,
+    isWorkingDay: false,
+  }));
+}
+
+// Fixed Holidays default seed list for 2026
+const fixedHolidays = getStandardNationalHolidays(2026);
 
 // Default Departments for the organization
 const defaultDepartments = [
@@ -390,18 +469,88 @@ export const dataStore = {
 
   // LEAVE POLICIES & BALANCES
   async getLeavePolicies() {
+    if (await isPrismaAvailable()) {
+      try {
+        // Ensure standard policies exist in DB including Compensatory Off (with 0 default days)
+        for (const pol of defaultLeavePolicies) {
+          await prisma.leaveTypePolicy.upsert({
+            where: { code: pol.code },
+            update: {},
+            create: {
+              name: pol.name,
+              code: pol.code,
+              defaultDaysPerYear: pol.defaultDaysPerYear,
+              description: pol.description,
+              color: pol.color,
+            },
+          }).catch(() => {});
+        }
+
+        const dbPolicies = await prisma.leaveTypePolicy.findMany({
+          orderBy: { createdAt: "asc" },
+        });
+        if (dbPolicies && dbPolicies.length > 0) {
+          return dbPolicies;
+        }
+      } catch (err) {
+        console.warn("Prisma getLeavePolicies fallback:", err.message);
+      }
+    }
     return globalMemory.__ERP_POLICIES__;
   },
 
   async addLeavePolicy(data) {
+    const defaultDays = data.defaultDaysPerYear !== undefined ? parseFloat(data.defaultDaysPerYear) : 10;
     const newPolicy = {
       id: "policy-" + Date.now(),
       name: data.name,
-      code: data.code || data.name.substring(0, 2).toUpperCase(),
-      defaultDaysPerYear: parseFloat(data.defaultDaysPerYear) || 10,
+      code: data.code || data.name.substring(0, 4).toUpperCase().trim(),
+      defaultDaysPerYear: defaultDays,
       description: data.description || "",
       color: data.color || "indigo",
     };
+
+    if (await isPrismaAvailable()) {
+      try {
+        const created = await prisma.leaveTypePolicy.create({
+          data: {
+            name: newPolicy.name,
+            code: newPolicy.code,
+            defaultDaysPerYear: newPolicy.defaultDaysPerYear,
+            description: newPolicy.description,
+            color: newPolicy.color,
+          },
+        });
+
+        // Automatically allocate this new leave type to all existing employees for year 2026
+        const allUsers = await prisma.user.findMany({ select: { id: true } });
+        for (const u of allUsers) {
+          await prisma.leaveBalance.upsert({
+            where: {
+              userId_year_leaveType: {
+                userId: u.id,
+                year: 2026,
+                leaveType: created.name,
+              },
+            },
+            update: {},
+            create: {
+              userId: u.id,
+              year: 2026,
+              leaveType: created.name,
+              allocatedDays: created.defaultDaysPerYear,
+              usedDays: 0,
+              remainingDays: created.defaultDaysPerYear,
+            },
+          }).catch(() => {});
+        }
+
+        return created;
+      } catch (err) {
+        console.warn("Prisma addLeavePolicy fallback:", err.message);
+      }
+    }
+
     globalMemory.__ERP_POLICIES__.push(newPolicy);
 
     // Automatically allocate this new leave type to all employees for the year 2026
@@ -428,6 +577,41 @@ export const dataStore = {
   },
 
   async updateLeavePolicy(id, data) {
+    if (await isPrismaAvailable()) {
+      try {
+        const existing = await prisma.leaveTypePolicy.findUnique({ where: { id } });
+        if (existing) {
+          const newName = data.name || existing.name;
+          const newDays = data.defaultDaysPerYear !== undefined ? parseFloat(data.defaultDaysPerYear) : existing.defaultDaysPerYear;
+          const updated = await prisma.leaveTypePolicy.update({
+            where: { id },
+            data: {
+              name: newName,
+              code: data.code || existing.code,
+              defaultDaysPerYear: newDays,
+              description: data.description !== undefined ? data.description : existing.description,
+              color: data.color || existing.color,
+            },
+          });
+
+          if (newName !== existing.name) {
+            await prisma.leaveBalance.updateMany({
+              where: { leaveType: existing.name },
+              data: { leaveType: newName },
+            });
+            await prisma.leaveRequest.updateMany({
+              where: { leaveType: existing.name },
+              data: { leaveType: newName },
+            });
+          }
+
+          return updated;
+        }
+      } catch (err) {
+        console.warn("Prisma updateLeavePolicy fallback:", err.message);
+      }
+    }
+
     const index = globalMemory.__ERP_POLICIES__.findIndex((p) => p.id === id);
     if (index === -1) return null;
 
@@ -468,6 +652,19 @@ export const dataStore = {
   },
 
   async deleteLeavePolicy(id) {
+    if (await isPrismaAvailable()) {
+      try {
+        const pol = await prisma.leaveTypePolicy.findUnique({ where: { id } });
+        if (pol) {
+          await prisma.leaveBalance.deleteMany({ where: { leaveType: pol.name } });
+          await prisma.leaveTypePolicy.delete({ where: { id } });
+          return true;
+        }
+      } catch (err) {
+        console.warn("Prisma deleteLeavePolicy fallback:", err.message);
+      }
+    }
+
     const policy = globalMemory.__ERP_POLICIES__.find((p) => p.id === id);
     if (!policy) return false;
 
@@ -477,6 +674,44 @@ export const dataStore = {
   },
 
   async getEmployeeBalances(userId, year = 2026) {
+    if (await isPrismaAvailable()) {
+      try {
+        const policies = await prisma.leaveTypePolicy.findMany();
+        // Ensure balances exist for all policies (Compensatory Off defaults to 0 allocated/remaining)
+        for (const p of policies) {
+          await prisma.leaveBalance.upsert({
+            where: {
+              userId_year_leaveType: {
+                userId,
+                year,
+                leaveType: p.name,
+              },
+            },
+            update: {},
+            create: {
+              userId,
+              year,
+              leaveType: p.name,
+              allocatedDays: p.defaultDaysPerYear,
+              usedDays: 0,
+              remainingDays: p.defaultDaysPerYear,
+            },
+          }).catch(() => {});
+        }
+
+        const dbBalances = await prisma.leaveBalance.findMany({
+          where: { userId, year },
+          orderBy: { leaveType: "asc" },
+        });
+
+        if (dbBalances && dbBalances.length > 0) {
+          return dbBalances;
+        }
+      } catch (err) {
+        console.warn("Prisma getEmployeeBalances fallback:", err.message);
+      }
+    }
+
     let balances = globalMemory.__ERP_BALANCES__.filter(
       (b) => b.userId === userId && b.year === year
     );
@@ -506,6 +741,42 @@ export const dataStore = {
 
   // LEAVE REQUESTS
   async getLeaves(filters = {}) {
+    if (await isPrismaAvailable()) {
+      try {
+        const where = {};
+        if (filters.userId) where.userId = filters.userId;
+        if (filters.status && filters.status !== "ALL") where.status = filters.status;
+
+        const dbLeaves = await prisma.leaveRequest.findMany({
+          where,
+          include: {
+            user: {
+              select: {
+                id: true,
+                employeeId: true,
+                name: true,
+                email: true,
+                department: true,
+                designation: true,
+                avatarUrl: true,
+              },
+            },
+          },
+          orderBy: { createdAt: "desc" },
+        });
+
+        return dbLeaves.map((l) => ({
+          ...l,
+          startDate: l.startDate.toISOString(),
+          endDate: l.endDate.toISOString(),
+          createdAt: l.createdAt.toISOString(),
+          updatedAt: l.updatedAt.toISOString(),
+        }));
+      } catch (err) {
+        console.warn("Prisma getLeaves fallback:", err.message);
+      }
+    }
+
     let result = globalMemory.__ERP_LEAVES__.map((leave) => {
       const user = globalMemory.__ERP_EMPLOYEES__.find((e) => e.id === leave.userId);
       return { ...leave, user };
@@ -546,6 +817,51 @@ export const dataStore = {
       updatedAt: new Date().toISOString(),
     };
 
+    if (await isPrismaAvailable()) {
+      try {
+        const created = await prisma.leaveRequest.create({
+          data: {
+            userId: data.userId,
+            leaveType: data.leaveType,
+            startDate: new Date(data.startDate),
+            endDate: new Date(data.endDate),
+            isHalfDay: !!data.isHalfDay,
+            halfDayType: data.halfDayType || null,
+            daysCount,
+            reason: data.reason,
+            inchargePerson: data.inchargePerson || null,
+            contactDuringLeave: data.contactDuringLeave || null,
+            documentUrl: data.documentUrl || null,
+            documentName: data.documentName || null,
+            status: "PENDING",
+          },
+          include: {
+            user: {
+              select: {
+                id: true,
+                employeeId: true,
+                name: true,
+                email: true,
+                department: true,
+                designation: true,
+                avatarUrl: true,
+              },
+            },
+          },
+        });
+
+        return {
+          ...created,
+          startDate: created.startDate.toISOString(),
+          endDate: created.endDate.toISOString(),
+          createdAt: created.createdAt.toISOString(),
+          updatedAt: created.updatedAt.toISOString(),
+        };
+      } catch (err) {
+        console.warn("Prisma createLeave fallback:", err.message);
+      }
+    }
+
     globalMemory.__ERP_LEAVES__.unshift(newLeave);
 
     const user = globalMemory.__ERP_EMPLOYEES__.find((e) => e.id === data.userId);
@@ -553,6 +869,65 @@ export const dataStore = {
   },
 
   async updateLeaveStatus(id, { status, actionNotes, actionBy }) {
+    if (await isPrismaAvailable()) {
+      try {
+        const leave = await prisma.leaveRequest.findUnique({ where: { id } });
+        if (leave) {
+          const previousStatus = leave.status;
+          const updated = await prisma.leaveRequest.update({
+            where: { id },
+            data: {
+              status,
+              actionNotes: actionNotes || null,
+              actionDate: new Date(),
+              actionBy: actionBy || "Admin",
+            },
+            include: { user: true },
+          });
+
+          // If newly approved, update leave balance used days and remaining days
+          if (status === "APPROVED" && previousStatus !== "APPROVED") {
+            await prisma.leaveBalance.updateMany({
+              where: {
+                userId: leave.userId,
+                year: 2026,
+                leaveType: leave.leaveType,
+              },
+              data: {
+                usedDays: { increment: leave.daysCount },
+                remainingDays: { decrement: leave.daysCount },
+              },
+            });
+          }
+
+          // If previously approved but now rejected, restore used days
+          if (previousStatus === "APPROVED" && status === "REJECTED") {
+            await prisma.leaveBalance.updateMany({
+              where: {
+                userId: leave.userId,
+                year: 2026,
+                leaveType: leave.leaveType,
+              },
+              data: {
+                usedDays: { decrement: leave.daysCount },
+                remainingDays: { increment: leave.daysCount },
+              },
+            });
+          }
+
+          return {
+            ...updated,
+            startDate: updated.startDate.toISOString(),
+            endDate: updated.endDate.toISOString(),
+            createdAt: updated.createdAt.toISOString(),
+            updatedAt: updated.updatedAt.toISOString(),
+          };
+        }
+      } catch (err) {
+        console.warn("Prisma updateLeaveStatus fallback:", err.message);
+      }
+    }
+
     const index = globalMemory.__ERP_LEAVES__.findIndex((l) => l.id === id);
     if (index === -1) return null;
 
@@ -607,35 +982,43 @@ export const dataStore = {
   },
 
   // HOLIDAYS & WORK ROSTER METHODS
-  async getHolidays() {
+  async getHolidays(targetYear) {
+    // Generate automatic national & gazetted public holidays for calendar years (Republic Day, Independence Day, Gandhi Jayanti, Christmas Day, etc.)
+    const yearsToGenerate = targetYear ? [parseInt(targetYear, 10)] : [2025, 2026, 2027];
+    const nationalHolidays = [];
+    yearsToGenerate.forEach((y) => {
+      nationalHolidays.push(...getStandardNationalHolidays(y));
+    });
+
+    let dbHolidays = [];
     if (await isPrismaAvailable()) {
       try {
-        const count = await prisma.holiday.count();
-        if (count === 0) {
-          // Seed fixed holidays
-          for (const h of fixedHolidays) {
-            await prisma.holiday.create({
-              data: {
-                name: h.name,
-                date: new Date(h.date),
-                type: h.type,
-                isWorkingDay: false,
-              },
-            });
-          }
-        }
-        const dbHolidays = await prisma.holiday.findMany({
+        const holidaysInDb = await prisma.holiday.findMany({
           orderBy: { date: "asc" },
         });
-        return dbHolidays.map((h) => ({
+        dbHolidays = holidaysInDb.map((h) => ({
           ...h,
           date: h.date.toISOString().split("T")[0],
         }));
       } catch (err) {
         console.warn("Prisma holidays fallback:", err.message);
+        dbHolidays = globalMemory.__ERP_HOLIDAYS__ || [];
       }
+    } else {
+      dbHolidays = globalMemory.__ERP_HOLIDAYS__ || [];
     }
-    return globalMemory.__ERP_HOLIDAYS__;
+
+    // Merge: National holidays are automatically included across the annual calendar.
+    // Any holiday explicitly added or overridden in the Database (e.g. forced working day) takes precedence!
+    const holidayMap = new Map();
+    for (const nat of nationalHolidays) {
+      holidayMap.set(nat.date, nat);
+    }
+    for (const dbh of dbHolidays) {
+      holidayMap.set(dbh.date, dbh);
+    }
+
+    return Array.from(holidayMap.values()).sort((a, b) => a.date.localeCompare(b.date));
   },
 
   async createHoliday(data) {
@@ -978,6 +1361,9 @@ export const dataStore = {
   async updateCompOffStatus(id, { status, actionNotes, actionBy }) {
     if (await isPrismaAvailable()) {
       try {
+        const existing = await prisma.compOffRequest.findUnique({ where: { id } });
+        const previousStatus = existing ? existing.status : null;
+
         const updated = await prisma.compOffRequest.update({
           where: { id },
           data: {
@@ -991,8 +1377,8 @@ export const dataStore = {
           },
         });
 
-        // If APPROVED, credit exactly +1 Comp Off leave day to the employee's LeaveBalance!
-        if (status === "APPROVED") {
+        // If newly APPROVED, credit exactly +1 Comp Off leave day to the employee's LeaveBalance!
+        if (status === "APPROVED" && previousStatus !== "APPROVED") {
           await prisma.leaveBalance.upsert({
             where: {
               userId_year_leaveType: {
@@ -1016,6 +1402,22 @@ export const dataStore = {
           });
         }
 
+        // If previously approved but now rejected, deduct 1 day
+        if (previousStatus === "APPROVED" && status === "REJECTED") {
+          await prisma.leaveBalance.updateMany({
+            where: {
+              userId: updated.userId,
+              year: 2026,
+              leaveType: "Compensatory Off",
+              allocatedDays: { gt: 0 },
+            },
+            data: {
+              allocatedDays: { decrement: 1 },
+              remainingDays: { decrement: 1 },
+            },
+          });
+        }
+
         return updated;
       } catch (err) {
         console.warn("Prisma compOff update fallback:", err.message);
@@ -1025,6 +1427,7 @@ export const dataStore = {
     const index = globalMemory.__ERP_COMP_OFFS__.findIndex((c) => c.id === id);
     if (index === -1) return null;
 
+    const previousStatus = globalMemory.__ERP_COMP_OFFS__[index].status;
     globalMemory.__ERP_COMP_OFFS__[index] = {
       ...globalMemory.__ERP_COMP_OFFS__[index],
       status,
@@ -1036,8 +1439,8 @@ export const dataStore = {
 
     const claim = globalMemory.__ERP_COMP_OFFS__[index];
 
-    // If APPROVED, credit +1 to in-memory balance
-    if (status === "APPROVED") {
+    // If newly APPROVED, credit +1 to in-memory balance
+    if (status === "APPROVED" && previousStatus !== "APPROVED") {
       const balIndex = globalMemory.__ERP_BALANCES__.findIndex(
         (b) => b.userId === claim.userId && b.year === 2026 && (b.leaveType === "Compensatory Off" || b.leaveType === "Comp Off")
       );
@@ -1061,6 +1464,22 @@ export const dataStore = {
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         });
+      }
+    }
+
+    // If previously APPROVED and now REJECTED, decrement 1 day
+    if (previousStatus === "APPROVED" && status === "REJECTED") {
+      const balIndex = globalMemory.__ERP_BALANCES__.findIndex(
+        (b) => b.userId === claim.userId && b.year === 2026 && (b.leaveType === "Compensatory Off" || b.leaveType === "Comp Off")
+      );
+      if (balIndex !== -1) {
+        const bal = globalMemory.__ERP_BALANCES__[balIndex];
+        globalMemory.__ERP_BALANCES__[balIndex] = {
+          ...bal,
+          allocatedDays: Math.max(0, bal.allocatedDays - 1),
+          remainingDays: Math.max(0, bal.remainingDays - 1),
+          updatedAt: new Date().toISOString(),
+        };
       }
     }
 
