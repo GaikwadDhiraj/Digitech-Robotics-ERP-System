@@ -1,0 +1,67 @@
+{
+  "name": "Digitech Robotics ERP System",
+  "short_name": "Digitech ERP",
+  "description": "Enterprise Resource Planning & Workforce Management - Digitech Robotics India Pvt. Ltd.",
+  "start_url": "/",
+  "id": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#ffffff",
+  "theme_color": "#7a1228",
+  "categories": ["business", "productivity"],
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icon.png",
+      "sizes": "500x500",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Employee Portal",
+      "url": "/employee",
+      "description": "Access Employee Self-Service Portal"
+    },
+    {
+      "name": "Attendance Calendar",
+      "url": "/employee/calendar",
+      "description": "View Monthly Attendance and Roster"
+    },
+    {
+      "name": "Admin Console",
+      "url": "/admin",
+      "description": "Access Administrative Management Console"
+    },
+    {
+      "name": "Leave Sanctions",
+      "url": "/admin/leaves",
+      "description": "Review and Sanction Leave Requests"
+    }
+  ]
+}
