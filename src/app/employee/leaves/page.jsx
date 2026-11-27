@@ -141,6 +141,14 @@ export default function EmployeeLeavePage() {
   // Check remaining leaves for currently selected leave type
   const selectedBalance = balances.find((b) => b.leaveType === formData.leaveType);
   const remainingDays = selectedBalance ? selectedBalance.remainingDays : 0;
+  const isUnlimitedType =
+    formData.leaveType === "On Duty Leave" ||
+    formData.leaveType === "In Duty Leave" ||
+    selectedBalance?.isUnlimited;
+  const isCompOffType =
+    formData.leaveType === "Compensatory Off" ||
+    formData.leaveType === "Comp Off" ||
+    selectedBalance?.isCompOff;
 
   const handleSubmitLeave = async (e) => {
     e.preventDefault();
@@ -149,8 +157,22 @@ export default function EmployeeLeavePage() {
       return;
     }
 
-    if (formData.daysCount > remainingDays) {
-      if (!window.confirm(`Warning: Your request of ${formData.daysCount} days exceeds your remaining balance of ${remainingDays} days for ${formData.leaveType}. Do you still wish to submit for admin review?`)) {
+    // Comp Off validation (must have valid, unexpired balance within 60 days)
+    if (isCompOffType && remainingDays <= 0) {
+      setNotification({
+        type: "error",
+        message:
+          "You have 0 valid Compensatory Off days. Compensatory off is only valid for 60 days from the day worked and cannot be used after expiry.",
+      });
+      return;
+    }
+
+    if (!isUnlimitedType && formData.daysCount > remainingDays) {
+      if (
+        !window.confirm(
+          `Warning: Your request of ${formData.daysCount} day(s) exceeds your remaining balance of ${remainingDays} day(s) for ${formData.leaveType}. Do you still wish to submit for admin review?`
+        )
+      ) {
         return;
       }
     }
@@ -274,27 +296,50 @@ export default function EmployeeLeavePage() {
 
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
             {balances.map((bal) => {
+              const isUnlimited =
+                bal.isUnlimited ||
+                bal.leaveType === "On Duty Leave" ||
+                bal.leaveType === "In Duty Leave";
+              const isCompOff =
+                bal.isCompOff ||
+                bal.leaveType === "Compensatory Off" ||
+                bal.leaveType === "Comp Off";
               const percentRemaining = bal.allocatedDays > 0 ? (bal.remainingDays / bal.allocatedDays) * 100 : 0;
               return (
                 <div key={bal.id} className="p-4 rounded-xl border border-slate-100 bg-slate-50/60 flex flex-col justify-between">
                   <div>
                     <span className="text-xs font-bold text-slate-800">{bal.leaveType}</span>
                     <div className="flex items-baseline gap-1 mt-2">
-                      <span className="text-2xl font-black text-indigo-600">{bal.remainingDays}</span>
-                      <span className="text-xs text-slate-400">/ {bal.allocatedDays} remaining</span>
+                      {isUnlimited ? (
+                        <span className="text-xl font-black text-sky-600">No Limit</span>
+                      ) : (
+                        <>
+                          <span className="text-2xl font-black text-indigo-600">{bal.remainingDays}</span>
+                          <span className="text-xs text-slate-400">/ {bal.allocatedDays} remaining</span>
+                        </>
+                      )}
                     </div>
                   </div>
                   <div className="mt-3">
-                    <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
-                      <div
-                        className="bg-indigo-600 h-full rounded-full transition-all"
-                        style={{ width: `${Math.min(100, Math.max(0, percentRemaining))}%` }}
-                      />
-                    </div>
-                    <div className="flex justify-between text-[10px] text-slate-400 mt-1 font-medium">
-                      <span>Used: {bal.usedDays}</span>
-                      <span>Total: {bal.allocatedDays}</span>
-                    </div>
+                    {isUnlimited ? (
+                      <div className="flex justify-between text-[10px] text-slate-400 mt-1 font-medium">
+                        <span>Used: {bal.usedDays} days</span>
+                        <span className="text-sky-600 font-bold">Unlimited</span>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
+                          <div
+                            className="bg-indigo-600 h-full rounded-full transition-all"
+                            style={{ width: `${Math.min(100, Math.max(0, percentRemaining))}%` }}
+                          />
+                        </div>
+                        <div className="flex justify-between text-[10px] text-slate-400 mt-1 font-medium">
+                          <span>Used: {bal.usedDays}</span>
+                          <span>{isCompOff ? "Valid for 60 Days" : `Total: ${bal.allocatedDays}`}</span>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
               );
@@ -330,17 +375,33 @@ export default function EmployeeLeavePage() {
                     className="w-full text-xs font-medium bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
                   >
                     {balances.length > 0 ? (
-                      balances.map((b) => (
-                        <option key={b.id} value={b.leaveType}>
-                          {b.leaveType} ({b.remainingDays} days left)
-                        </option>
-                      ))
+                      balances.map((b) => {
+                        const isUnlimited =
+                          b.isUnlimited ||
+                          b.leaveType === "On Duty Leave" ||
+                          b.leaveType === "In Duty Leave";
+                        const isCompOff =
+                          b.isCompOff ||
+                          b.leaveType === "Compensatory Off" ||
+                          b.leaveType === "Comp Off";
+                        return (
+                          <option key={b.id} value={b.leaveType}>
+                            {b.leaveType}{" "}
+                            {isUnlimited
+                              ? "(No Limit / Unlimited)"
+                              : isCompOff
+                              ? `(${b.remainingDays} days left • Valid 60 Days)`
+                              : `(${b.remainingDays} days left)`}
+                          </option>
+                        );
+                      })
                     ) : (
                       <>
                         <option value="Casual Leave">Casual Leave</option>
                         <option value="Sick Leave">Sick Leave</option>
                         <option value="Annual Leave">Annual Leave</option>
                         <option value="Emergency Leave">Emergency Leave</option>
+                        <option value="On Duty Leave">On Duty Leave (No Limit)</option>
                       </>
                     )}
                   </select>

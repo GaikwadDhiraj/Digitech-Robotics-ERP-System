@@ -1397,7 +1397,9 @@ export default function EmployeeCalendarPage() {
                                 {cell.compOff.status === "APPROVED" ? (
                                    <>
                                     <Award className="w-2.5 h-2.5 text-emerald-600 shrink-0" />
-                                    <span>Comp Off Credited</span>
+                                    <span>
+                                      {cell.compOff.isExpired ? "Comp Off (Expired)" : "Comp Off (Valid 60D)"}
+                                    </span>
                                   </>
                                 ) : cell.compOff.status === "REJECTED" ? (
                                   <span>Comp Off: Rejected</span>
@@ -1411,13 +1413,19 @@ export default function EmployeeCalendarPage() {
                               <span
                                 className={`text-[8px] font-black uppercase px-1 py-0.2 rounded ${
                                   cell.compOff.status === "APPROVED"
-                                    ? "bg-emerald-200 text-emerald-900"
+                                    ? cell.compOff.isExpired
+                                      ? "bg-rose-100 text-rose-800"
+                                      : "bg-emerald-200 text-emerald-900"
                                     : cell.compOff.status === "REJECTED"
                                     ? "bg-rose-200 text-rose-900"
                                     : "bg-amber-200 text-amber-900"
                                 }`}
                               >
-                                {cell.compOff.status === "APPROVED" ? "+1 DAY" : cell.compOff.status}
+                                {cell.compOff.status === "APPROVED"
+                                  ? cell.compOff.isExpired
+                                    ? "EXPIRED"
+                                    : "+1 DAY"
+                                  : cell.compOff.status}
                               </span>
                             </div>
                             <div className="text-[9px] font-semibold opacity-90 flex items-center justify-between pt-0.5 border-t border-black/5">

@@ -13,7 +13,7 @@ export async function GET() {
 export async function POST(request) {
   try {
     const body = await request.json();
-    if (!body.name || !body.defaultDaysPerYear) {
+    if (!body.name || (body.defaultDaysPerYear === undefined && !body.isUnlimited)) {
       return NextResponse.json(
         { success: false, error: "Policy name and default days per year are required." },
         { status: 400 }

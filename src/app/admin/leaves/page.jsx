@@ -105,6 +105,7 @@ export default function AdminLeaveSanctionsPage() {
       name: "",
       code: "",
       defaultDaysPerYear: 12,
+      isUnlimited: false,
       description: "",
       color: "rose",
     });
@@ -113,10 +114,17 @@ export default function AdminLeaveSanctionsPage() {
 
   const openEditPolicyModal = (pol) => {
     setEditingPolicy(pol);
+    const isUnlimited =
+      pol.isUnlimited ||
+      pol.defaultDaysPerYear === 0 ||
+      pol.code === "OD" ||
+      pol.name === "On Duty Leave" ||
+      pol.name === "In Duty Leave";
     setPolicyForm({
       name: pol.name,
       code: pol.code,
-      defaultDaysPerYear: pol.defaultDaysPerYear,
+      defaultDaysPerYear: isUnlimited ? 0 : pol.defaultDaysPerYear,
+      isUnlimited,
       description: pol.description || "",
       color: pol.color || "rose",
     });
@@ -368,10 +376,24 @@ export default function AdminLeaveSanctionsPage() {
   // Handle Create or Update Leave Policy
   const handleSavePolicy = async (e) => {
     e.preventDefault();
-    if (!policyForm.name || !policyForm.defaultDaysPerYear) {
-      setNotification({ type: "error", message: "Please provide policy name and days quota." });
+    if (!policyForm.name.trim()) {
+      setNotification({ type: "error", message: "Please provide a valid leave policy name." });
       return;
     }
+
+    if (!policyForm.isUnlimited && (policyForm.defaultDaysPerYear === undefined || policyForm.defaultDaysPerYear === null || policyForm.defaultDaysPerYear === "")) {
+      setNotification({ type: "error", message: "Please provide annual days quota." });
+      return;
+    }
+
+    const payload = {
+      name: policyForm.name.trim(),
+      code: (policyForm.code || policyForm.name.substring(0, 4)).toUpperCase().trim(),
+      defaultDaysPerYear: policyForm.isUnlimited ? 0 : parseFloat(policyForm.defaultDaysPerYear) || 0,
+      isUnlimited: !!policyForm.isUnlimited,
+      description: policyForm.description || "",
+      color: policyForm.color || "rose",
+    };
 
     setSavingPolicy(true);
     try {
@@ -380,13 +402,13 @@ export default function AdminLeaveSanctionsPage() {
         const res = await fetch(`/api/leave-policies/${editingPolicy.id}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(policyForm),
+          body: JSON.stringify(payload),
         });
         const result = await res.json();
         if (result.success) {
           setNotification({
             type: "success",
-            message: `Leave type "${policyForm.name}" updated! Employee balances adjusted accordingly.`,
+            message: `Leave policy "${payload.name}" updated successfully!`,
           });
           setIsPolicyModalOpen(false);
           loadData();
@@ -398,14 +420,14 @@ export default function AdminLeaveSanctionsPage() {
         const res = await fetch("/api/leave-policies", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(policyForm),
+          body: JSON.stringify(payload),
         });
 
         const result = await res.json();
         if (result.success) {
           setNotification({
             type: "success",
-            message: `Leave type "${policyForm.name}" created and automatically assigned to each employee for 1 Jan - 31 Dec 2026!`,
+            message: `Leave policy "${payload.name}" created and assigned to all employees for 1 Jan - 31 Dec 2026!`,
           });
           setIsPolicyModalOpen(false);
           loadData();
@@ -414,7 +436,7 @@ export default function AdminLeaveSanctionsPage() {
         }
       }
     } catch (err) {
-      setNotification({ type: "error", message: "Failed to save leave policy." });
+      setNotification({ type: "error", message: "Failed to save leave policy: " + err.message });
     } finally {
       setSavingPolicy(false);
     }
@@ -1067,6 +1089,25 @@ export default function AdminLeaveSanctionsPage() {
                                 </span>
                               </div>
 
+                              {claim.status === "APPROVED" && claim.validUntil && (
+                                <div className="mt-2 flex flex-wrap items-center gap-2">
+                                  {claim.isExpired ? (
+                                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-800 bg-rose-50 border border-rose-200 px-2.5 py-0.5 rounded-md">
+                                      <Clock className="w-3 h-3 text-rose-600" />
+                                      Expired (60-day validity elapsed on {new Date(claim.validUntil).toLocaleDateString("en-IN")})
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-sky-800 bg-sky-50 border border-sky-200 px-2.5 py-0.5 rounded-md">
+                                      <Clock className="w-3 h-3 text-sky-600" />
+                                      Valid until {new Date(claim.validUntil).toLocaleDateString("en-IN")} ({claim.daysRemaining} days left)
+                                    </span>
+                                  )}
+                                  <span className="text-[10px] text-slate-400">
+                                    • Valid for 60 days from worked date
+                                  </span>
+                                </div>
+                              )}
+
                               <div className="mt-3 p-3 bg-slate-50/80 rounded-xl border border-slate-100 text-xs text-slate-700">
                                 <span className="font-bold text-slate-800">Duty / Task Details:</span> {claim.reason}
                               </div>
@@ -1089,9 +1130,22 @@ export default function AdminLeaveSanctionsPage() {
                                 </span>
                               )}
                               {claim.status === "APPROVED" && (
-                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-900 border border-emerald-200">
-                                  <CheckCircle className="w-3 h-3 text-emerald-600" />
-                                  Approved (+1 Day Credited)
+                                <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${
+                                  claim.isExpired
+                                    ? "bg-rose-50 text-rose-800 border border-rose-200"
+                                    : "bg-emerald-50 text-emerald-900 border border-emerald-200"
+                                }`}>
+                                  {claim.isExpired ? (
+                                    <>
+                                      <Clock className="w-3 h-3 text-rose-600" />
+                                      Approved (Expired after 60 Days)
+                                    </>
+                                  ) : (
+                                    <>
+                                      <CheckCircle className="w-3 h-3 text-emerald-600" />
+                                      Approved (+1 Day Active)
+                                    </>
+                                  )}
                                 </span>
                               )}
                               {claim.status === "REJECTED" && (
@@ -1201,11 +1255,29 @@ export default function AdminLeaveSanctionsPage() {
                   <div className="pt-3 border-t border-slate-200 flex items-center justify-between">
                     <div>
                       <span className="text-[11px] text-slate-400 uppercase font-semibold">Days / Year</span>
-                      <div className="text-xl font-black text-rose-950">{pol.defaultDaysPerYear} Days</div>
+                      <div className="text-xl font-black text-rose-950">
+                        {pol.code === "CO" ? (
+                          <span className="text-sm font-bold text-teal-800">Earned via Claims</span>
+                        ) : pol.isUnlimited || pol.code === "OD" || pol.name === "On Duty Leave" || pol.defaultDaysPerYear === 0 ? (
+                          <span className="text-sm font-bold text-sky-800">No Limit (Unlimited)</span>
+                        ) : (
+                          `${pol.defaultDaysPerYear} Days`
+                        )}
+                      </div>
                     </div>
-                    <span className="text-[10px] text-emerald-800 font-bold bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full">
-                      1 Jan - 31 Dec Cycle
-                    </span>
+                    {pol.code === "CO" ? (
+                      <span className="text-[10px] text-teal-800 font-bold bg-teal-50 border border-teal-200 px-2.5 py-1 rounded-full">
+                        Valid for 60 Days
+                      </span>
+                    ) : pol.isUnlimited || pol.code === "OD" || pol.name === "On Duty Leave" ? (
+                      <span className="text-[10px] text-sky-800 font-bold bg-sky-50 border border-sky-200 px-2.5 py-1 rounded-full">
+                        Unlimited Quota
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-emerald-800 font-bold bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full">
+                        1 Jan - 31 Dec Cycle
+                      </span>
+                    )}
                   </div>
                 </div>
               ))}
@@ -1719,18 +1791,46 @@ export default function AdminLeaveSanctionsPage() {
 
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                      Annual Days Quota <span className="text-rose-500">*</span>
+                      Annual Days Quota {!policyForm.isUnlimited && <span className="text-rose-500">*</span>}
                     </label>
                     <input
                       type="number"
-                      value={policyForm.defaultDaysPerYear}
+                      value={policyForm.isUnlimited ? 0 : policyForm.defaultDaysPerYear}
                       onChange={(e) => setPolicyForm((p) => ({ ...p, defaultDaysPerYear: parseFloat(e.target.value) || 0 }))}
+                      disabled={policyForm.isUnlimited}
                       placeholder="12"
-                      required
-                      min={1}
-                      className="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2 text-slate-900 focus:ring-2 focus:ring-rose-500"
+                      required={!policyForm.isUnlimited}
+                      min={0}
+                      className="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2 text-slate-900 focus:ring-2 focus:ring-rose-500 disabled:bg-slate-100 disabled:text-slate-400"
                     />
                   </div>
+                </div>
+
+                {/* Unlimited / No Limit Quota Option (for On Duty Leave) */}
+                <div className="p-3 bg-sky-50/70 border border-sky-200/80 rounded-xl">
+                  <label className="flex items-start gap-2.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={!!policyForm.isUnlimited}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setPolicyForm((p) => ({
+                          ...p,
+                          isUnlimited: checked,
+                          defaultDaysPerYear: checked ? 0 : (p.defaultDaysPerYear || 12),
+                        }));
+                      }}
+                      className="mt-0.5 rounded text-sky-600 focus:ring-sky-500 w-4 h-4 cursor-pointer"
+                    />
+                    <div>
+                      <span className="text-xs font-bold text-sky-950 block">
+                        No Limit / Unlimited Leave (e.g. On Duty Leave)
+                      </span>
+                      <span className="text-[11px] text-sky-700 block mt-0.5">
+                        Employees can apply for official on-duty leave without any quota restriction.
+                      </span>
+                    </div>
+                  </label>
                 </div>
 
                 <div>
